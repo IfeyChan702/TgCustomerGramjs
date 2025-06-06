@@ -53,8 +53,8 @@ function codeCallback() {
 
 const { TelegramClient } = telegram;
 const { StringSession } = telegram.sessions;
-const apiId = 1; // put your api id here [for example 123456789]
-const apiHash = "1  "; // put your api hash here [for example '123456abcfghe']
+const apiId = 22059335; // put your api id here [for example 123456789]
+const apiHash = "5eb343d4aa291469585740ecccba1852"; // put your api hash here [for example '123456abcfghe']
 
 const client = new TelegramClient(new StringSession(""), apiId, apiHash, {
   connectionRetries: 3,
