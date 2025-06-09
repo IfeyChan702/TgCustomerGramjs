@@ -39,8 +39,8 @@ const PASSWORD_FORM = `
     <input type='submit'>
 </form>
 `;
-const API_ID = 22059335; // Fill your API ID
-const API_HASH = "5eb343d4aa291469585740ecccba1852"; // Fill your API Hash
+const API_ID = 0; // Fill your API ID
+const API_HASH = ""; // Fill your API Hash
 
 // Single client; can use an object if you want to store multiple clients
 const client = new TelegramClient(

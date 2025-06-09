@@ -3,8 +3,8 @@ const { StoreSession } = require("telegram/sessions");
 const input = require("input");
 const { NewMessage } = require("telegram/events"); // npm i input
 
-const API_ID = 22059335; // Fill your API ID
-const API_HASH = "5eb343d4aa291469585740ecccba1852"; // Fill your API Hash
+const API_ID = 0; // Fill your API ID
+const API_HASH = ""; // Fill your API Hash
 const STATES = {
   EMPTY: "no state (default)",
   ASK_FOR_NAME: "asks the user for a name",
