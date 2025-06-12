@@ -4,10 +4,10 @@ import * as fs from "fs";
 import { NewMessage } from "telegram/events";
 import * as readline from "readline";
 
-const sessionStr = fs.readFileSync("./Session.txt", "utf8").trim();
-const apiId = 22059335;
-const apiHash = "5eb343d4aa291469585740ecccba1852";
-const stringSession = new StringSession(sessionStr); // fill this later with the value from session.save()
+// const sessionStr = fs.readFileSync("./Session.txt", "utf8").trim();
+const apiId = 0;
+const apiHash = "";
+const stringSession = new StringSession(''); // fill this later with the value from session.save()
 
 const rl = readline.createInterface({
   input: process.stdin,
