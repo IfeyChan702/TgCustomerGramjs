@@ -1,12 +1,12 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
-import readline from "readline";
 import * as fs from "fs";
 import { NewMessage } from "telegram/events";
+import * as readline from "readline";
 
 const sessionStr = fs.readFileSync("./Session.txt", "utf8").trim();
-const apiId = 23539286;
-const apiHash = "02950d6f4ebe5564112b82243315fa59";
+const apiId = 22059335;
+const apiHash = "5eb343d4aa291469585740ecccba1852";
 const stringSession = new StringSession(sessionStr); // fill this later with the value from session.save()
 
 const rl = readline.createInterface({
@@ -36,10 +36,8 @@ const rl = readline.createInterface({
   });
   console.log("You should now be connected.");
   console.log(client.session.save()); // Save this string to avoid logging in again
-
-  // const messages = await client.getMessages(7711217827, {});
-  // console.log("First Message:", messages[0].message);
-
+  // await client.sendMessage(5860047689, { message: "Hi!辉哥" });
+  // 持续监听来自 8088901247 的消息
   client.addEventHandler(
     async (event) => {
       // 判断 senderId 是否为 8088901247
