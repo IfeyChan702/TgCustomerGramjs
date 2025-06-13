@@ -2,7 +2,7 @@ const { createClient } = require("redis");
 
 async function getAllRedisData() {
   const client = createClient({
-    url: "redis://localhost:6379" // Change this if needed
+    url: "redis://:test123456@192.168.3.77:44513" // Change this if needed
   });
 
   await client.connect();
@@ -48,4 +48,4 @@ async function clearRedisData() {
 }
 
 // Example usage
-clearRedisData();
+// clearRedisData();
