@@ -134,18 +134,21 @@ app.post("/insertHash", async (req, res) => {
   try {
     const { uuid, session, apiId, apiHash, phone, status, code } = req.body;
 
-    if (!uuid || !session || !apiId || !apiHash || !phone || !status) {
-      return res.status(400).json({ error: "uuid, session, apiId, apiHash, phone, and status are required." });
+    if (!uuid  || !apiId || !apiHash ) {
+      return res.status(400).json({ error: "uuid, apiId, apiHash are required." });
     }
 
-    const newData = {
-      session,
-      apiId,
-      apiHash,
-      phone,
-      status,
-      code
-    };
+    const newData = {};
+    if (session) newData["session"] = session;
+    if (apiId) newData["apiId"] = apiId;
+    if (apiHash) newData["apiHash"] = apiHash;
+    if (phone) newData["phone"] = phone;
+    if (status) newData["status"] = status;
+    if (code) newData["code"] = code;
+
+    if (Object.keys(newData).length === 0) {
+      return res.status(400).json({ error: "At least one field must be provided for insertion." });
+    }
 
     const result = await insertRedisHash(uuid, newData);
     res.json(result);
