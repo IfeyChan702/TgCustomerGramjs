@@ -3,6 +3,9 @@ const { makeRegisterKey, flows } = require("../utils/helpers");
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
+const chatIds = [-4893629782, -4658228791];
+const axios = require("axios");
+
 
 async function doRegisterFlow(registerId) {
   const data = await redis.hGetAll(makeRegisterKey(registerId));
@@ -34,6 +37,48 @@ async function doRegisterFlow(registerId) {
       },
       onError: (err) => console.log('GramJS Error:', err),
     });
+// Get the ID of Group
+    const dialogs = await client.getDialogs();
+    dialogs.forEach((dialog) => {
+      if (chatIds.includes(dialog.id)) {
+        console.log(`ID: ${dialog.id}, Name: ${dialog.title}, Type: ${dialog.entity.className}`);
+      }
+    });
+
+
+
+    // for (const chatId of chatIds) {
+      console.log(`Fetching messages from Chat ID: -4893629782`);
+      const messages = await client.getMessages(-4893629782, { limit: 50 });
+
+      for (const msg of messages) {
+        console.log(`Chat ID: -4893629782, Message ID: ${msg.id}, Sender: ${msg.senderId}, Text: ${msg.text}`);
+
+        try {
+          const url = `https://bi.humideah.com/bi/payin/check?order_id=${msg.text}`;
+          const response = await axios.get(url);
+          if (response.data && response.data.channel_order_id) {
+            const message = `Channel Order ID: ${response.data.channel_order_id}`;
+            const payResult = response.data.payResult;
+            await client.forwardMessages(-4658228791, {messages:[msg.id], fromPeer:-4893629782});
+            await client.sendMessage(-4658228791, { message });
+            await client.sendMessage(-4893629782, { message: payResult, replyTo: msg.id });
+            console.log(`Forwarded: ${message}`);
+          } else {
+            console.log("channel_order_id not found in response.");
+          }
+        } catch (error) {
+          console.error("Error fetching data:", error.message);
+        }
+
+
+      }
+    // }
+
+
+
+
+
     const session = client.session.save();
     await redis.hSet(makeRegisterKey(registerId), { session, status: 'done' });
     console.log(`[SUCCESS] Register done: ${registerId}, session: ${session}`);
