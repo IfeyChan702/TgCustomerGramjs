@@ -19,3 +19,8 @@ exports.login = async (req, res) => {
     msg: '账号或密码错误'
   });
 };
+
+
+exports.logout = (req, res) => {
+  res.json({ data: {}, success: true });
+};
