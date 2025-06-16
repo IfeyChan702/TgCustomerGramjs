@@ -12,7 +12,7 @@ exports.initTelegramRegister = async (req, res) => {
   const registerId = uuidv4();
 
   // Store in Redis
-  await redis.hSet(makeRegisterKey(registerId), { apiId, apiHash, status: 'waitPhone' });
+  await redis.hSet(makeRegisterKey(registerId), { apiId, apiHash, status: 'waitPhone', isRunning: 'false' });
 
   // Create promises for the registration flow
   flows[registerId] = {
