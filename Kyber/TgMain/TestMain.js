@@ -3,6 +3,7 @@ const { makeTgAccountPath } = require('./PubFun');
 const myTgKey = "5b59828d-ee69-4c42-86e0-e2d69872e256";
 // redisTest.js
 const { createClient } = require('redis');
+const express = require("express");
 
 // 远程 Redis 地址和密码（请换成你的真实配置）
 const redisUrl = 'redis://:test123456@192.168.3.77:44513'; // 有密码加:yourpassword@，无密码去掉
@@ -26,6 +27,19 @@ redisClient.on('error', (err) => console.log('Redis Client Error', err));
   const value = await redisClient.hGetAll(makeTgAccountPath(myTgKey));
   console.log(value);
 
-  await redisClient.quit();
+  // await redisClient.quit();
 })();
 
+const app = express();
+app.use(express.json());
+
+app.get('/api/tg/register/status', async (req, res) => {
+  const { registerId } = req.query;
+  if (!registerId) return res.status(400).json({ msg: '缺少参数' });
+  const result = await redisClient.hGetAll(makeTgAccountPath(registerId));
+  res.json(result);
+});
+
+app.listen(8080, () => {
+  console.log('后端服务已启动：http://localhost:8080');
+});
