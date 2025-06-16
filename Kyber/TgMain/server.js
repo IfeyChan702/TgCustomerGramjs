@@ -381,6 +381,6 @@ app.use('/api', telegramRoutes);
 
 
 
-app.listen(8080, () => {
-  console.log('后端服务已启动：http://localhost:8080');
+app.listen(3000, () => {
+  console.log('后端服务已启动：http://localhost:3000');
 });
