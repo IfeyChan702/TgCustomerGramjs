@@ -32,13 +32,14 @@ async function getAllRedisData() {
 }
 
 // Example usage:
-getAllRedisData().then(data => console.log("Redis Data:", data));
+// getAllRedisData().then(data => console.log("Redis Data:", data));
 
 // const { createClient } = require("redis");
 
 async function clearRedisData() {
-  const client = createClient({ url: "redis://localhost:6379" });
-
+  const client = createClient({
+    url: "redis://:test123456@192.168.3.77:44513" // Change this if needed
+  });
   await client.connect();
 
   await client.flushAll(); // Clears all Redis databases
@@ -48,4 +49,4 @@ async function clearRedisData() {
 }
 
 // Example usage
-// clearRedisData();
+clearRedisData();
