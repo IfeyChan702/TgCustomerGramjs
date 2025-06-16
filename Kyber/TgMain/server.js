@@ -12,6 +12,7 @@ const ruleRoutes = require('./src/routes/ruleRoutes');
 const telegramRoutes = require('./src/routes/telegramRoutes');
 
 const app = express();
+const PORT = 3000;
 app.use(express.json());
 
 // Redis 连接
@@ -381,6 +382,9 @@ app.use('/api', telegramRoutes);
 
 
 
-app.listen(3000, () => {
-  console.log('后端服务已启动：http://localhost:3000');
+// app.listen(3000, () => {
+//   console.log('后端服务已启动：http://localhost:3000');
+// });
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });

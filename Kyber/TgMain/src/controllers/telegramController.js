@@ -1,4 +1,5 @@
-const { uuid } = require('uuid');
+// const { uuid } = require('uuid');
+const { v4: uuidv4 } = require('uuid');
 const { flows, createDeferred } = require('../utils/helpers');
 const { redis } = require('../models/redisModel');
 const { makeRegisterKey } = require('../utils/helpers');
@@ -8,7 +9,7 @@ exports.initTelegramRegister = async (req, res) => {
   const { apiId, apiHash } = req.body;
   if (!apiId || !apiHash) return res.status(400).json({ msg: '缺少参数' });
 
-  const registerId = uuid.v4();
+  const registerId = uuidv4();
 
   // Store in Redis
   await redis.hSet(makeRegisterKey(registerId), { apiId, apiHash, status: 'waitPhone' });
