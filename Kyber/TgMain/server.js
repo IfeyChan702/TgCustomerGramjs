@@ -263,36 +263,43 @@ app.use('/api', telegramRoutes);
 
 
 // Step 2: 提交手机号
-app.post('/api/tg/register/phone', async (req, res) => {
-  const { registerId, phone } = req.body;
-  if (!registerId || !phone) return res.status(400).json({ msg: '缺少参数' });
-  await redis.hSet(makeRegisterKey(registerId), { phone, status: 'waitCode' });
-
-  // resolve phonePromise
-  if (flows[registerId]?.phone) flows[registerId].phone.resolve(phone);
-
-  res.json({ msg: 'ok' });
-});
+// app.post('/api/tg/register/phone', async (req, res) => {
+//   const { registerId, phone } = req.body;
+//   if (!registerId || !phone) return res.status(400).json({ msg: '缺少参数' });
+//   await redis.hSet(makeRegisterKey(registerId), { phone, status: 'waitCode' });
+//
+//   // resolve phonePromise
+//   if (flows[registerId]?.phone) flows[registerId].phone.resolve(phone);
+//
+//   res.json({ msg: 'ok' });
+// });
+// Register routes
+app.use('/api', telegramRoutes);
 
 // Step 3: 提交验证码
-app.post('/api/tg/register/code', async (req, res) => {
-  const { registerId, code } = req.body;
-  if (!registerId || !code) return res.status(400).json({ msg: '缺少参数' });
-  await redis.hSet(makeRegisterKey(registerId), { code, status: 'verifying' });
+// app.post('/api/tg/register/code', async (req, res) => {
+//   const { registerId, code } = req.body;
+//   if (!registerId || !code) return res.status(400).json({ msg: '缺少参数' });
+//   await redis.hSet(makeRegisterKey(registerId), { code, status: 'verifying' });
+//
+//   // resolve codePromise
+//   if (flows[registerId]?.code) flows[registerId].code.resolve(code);
+//
+//   res.json({ msg: 'ok' });
+// });
+// Register routes
+app.use('/api', telegramRoutes);
 
-  // resolve codePromise
-  if (flows[registerId]?.code) flows[registerId].code.resolve(code);
-
-  res.json({ msg: 'ok' });
-});
 
 // Step 4: 查询注册流程状态
-app.get('/api/tg/register/status', async (req, res) => {
-  const { registerId } = req.query;
-  if (!registerId) return res.status(400).json({ msg: '缺少参数' });
-  const result = await redis.hGetAll(makeRegisterKey(registerId));
-  res.json(result);
-});
+// app.get('/api/tg/register/status', async (req, res) => {
+//   const { registerId } = req.query;
+//   if (!registerId) return res.status(400).json({ msg: '缺少参数' });
+//   const result = await redis.hGetAll(makeRegisterKey(registerId));
+//   res.json(result);
+// });
+// Register routes
+app.use('/api', telegramRoutes);
 
 // 实际注册流程
 // async function doRegisterFlow(registerId) {
