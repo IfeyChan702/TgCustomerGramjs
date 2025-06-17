@@ -37,86 +37,75 @@ async function doRegisterFlow(registerId) {
       },
       onError: (err) => console.log('GramJS Error:', err),
     });
-// Get the ID of Group
-    const dialogs = await client.getDialogs();
-    dialogs.forEach((dialog) => {
-      if (chatIds.includes(dialog.id)) {
-        console.log(`ID: ${dialog.id}, Name: ${dialog.title}, Type: ${dialog.entity.className}`);
-      }
-    });
-
-
-
-    // for (const chatId of chatIds) {
-      console.log(`Fetching messages from Chat ID: -4893629782`);
-      const messages = await client.getMessages(-4893629782, { limit: 50 });
-
-      for (const msg of messages) {
-        console.log(`Chat ID: -4893629782, Message ID: ${msg.id}, Sender: ${msg.senderId}, Text: ${msg.text}`);
-
-        try {
-          const url = `https://bi.humideah.com/bi/payin/check?order_id=${msg.text}`;
-          const response = await axios.get(url);
-          if (response.data && response.data.channel_order_id) {
-            const message = `Channel Order ID: ${response.data.channel_order_id}`;
-            const payResult = response.data.payResult;
-            await client.forwardMessages(-4658228791, {messages:[msg.id], fromPeer:-4893629782});
-            await client.sendMessage(-4658228791, { message });
-            await client.sendMessage(-4893629782, { message: payResult, replyTo: msg.id });
-            console.log(`Forwarded: ${message}`);
-          } else {
-            console.log("channel_order_id not found in response.");
-          }
-        } catch (error) {
-          console.error("Error fetching data:", error.message);
-        }
-
-
-      }
-    // }
-
-
-
-
-
     const session = client.session.save();
     await redis.hSet(makeRegisterKey(registerId), { session, status: 'done' });
     console.log(`[SUCCESS] Register done: ${registerId}, session: ${session}`);
-    // 监听机制
-    client.addEventHandler(
-      async (event) => {
-        // 判断 senderId 是否为 8088901247
-        if (event.message.senderId && event.message.senderId.valueOf() === 8088901247) {
-          const msgText = event.message.text || "";
-          const fromPeer = await event.message.getInputChat();
-          console.log("收到来自 8088901247 的消息：", msgText);
 
-          if (msgText.includes("123")) {
-            await client.forwardMessages(7700169264, {
-              messages: [event.message.id], // 建议用数组
-              fromPeer: fromPeer
-            });
-            // 包含“123”，发送“成功”
-            await client.sendMessage(7700169264, { message: "成功" });
-          } else {
-            // 不包含“123”，转发并发送“失败”
-            if (!fromPeer) {
-              console.log("无法获取 fromPeer，消息未转发");
-              return;
-            }
-            await client.forwardMessages(7700169264, {
-              messages: [event.message.id], // 建议用数组
-              fromPeer: fromPeer
-            });
-            await client.sendMessage(7700169264, { message: "失败" });
-          }
-        }
-      },
-      new NewMessage({})
-    );
 
-    // 防止进程自动退出
-    setInterval(() => {}, 100000);
+//
+// // Get the ID of Group
+//     const dialogs = await client.getDialogs();
+//     dialogs.forEach((dialog) => {
+//       if (chatIds.includes(dialog.id)) {
+//         console.log(`ID: ${dialog.id}, Name: ${dialog.title}, TZype: ${dialog.entity.className}`);
+//       }
+//     });
+//
+//
+//
+//     // for (const chatId of chatIds) {
+//       console.log(`Fetching messages from Chat ID: -4893629782`);
+//       const messages = await client.getMessages(-4893629782, { limit: 50 });
+//
+//       for (const msg of messages) {
+//         console.log(`Chat ID: -4893629782, Message ID: ${msg.id}, Sender: ${msg.senderId}, Text: ${msg.text}`);
+//
+//         try {
+//           const url = `https://bi.humideah.com/bi/payin/check?order_id=${msg.text}`;
+//           const response = await axios.get(url);
+//           if (response.data && response.data.channel_order_id) {
+//             const message = `Channel Order ID: ${response.data.channel_order_id}`;
+//             const payResult = response.data.payResult;
+//             await client.forwardMessages(-4658228791, {messages:[msg.id], fromPeer:-4893629782});
+//             await client.sendMessage(-4658228791, { message });
+//             await client.sendMessage(-4893629782, { message: payResult, replyTo: msg.id });
+//             console.log(`Forwarded: ${message}`);
+//           } else {
+//             console.log("channel_order_id not found in response.");
+//           }
+//         } catch (error) {
+//           console.error("Error fetching data:", error.message);
+//         }
+//
+//
+//       }
+//     // }
+//
+
+    //
+    // // 监听机制
+    // console.log("Bot is listening for messages...");
+    //
+    // client.addEventHandler(async (event) => {
+    //   const message = event.message;
+    //
+    //   if (message && message.chatId === -4893629782 && message.media) {
+    //     console.log("Image detected, modifying caption...");
+    //
+    //     const newCaption = "This is the modified caption."; // Change the caption here
+    //
+    //     // Send the modified media to the target chat
+    //     await client.sendFile(-4658228791, {
+    //       file: message.media,
+    //       caption: newCaption,
+    //     });
+    //
+    //     console.log("Message sent successfully!");
+    //   }
+    // }, new Api.Updates());
+    //
+    // // 防止进程自动退出
+    // setInterval(() => {}, 100000);
   } catch (e) {
     await redis.hSet(makeRegisterKey(registerId), { status: 'fail', err: e.message });
     console.log(`[FAIL] Register error: ${registerId},`, e);
