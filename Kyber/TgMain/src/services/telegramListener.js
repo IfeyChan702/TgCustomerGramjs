@@ -20,7 +20,7 @@ startRedis();
 const SOURCE_CHAT_ID = -4893629782; // Chat ID to listen to
 const TARGET_CHAT_ID = -4658228791; // Chat ID to forward the modified image
 
-async function main() {
+async function listener() {
   const data = await redis.hGetAll(makeRegisterKey(registerId));
   const session = new StringSession(data.session);
   const client = new TelegramClient(session, Number(data.apiId), data.apiHash, { connectionRetries: 5 });
@@ -97,4 +97,5 @@ async function main() {
 
 }
 
-main();
+listener();
+// module.exports = { listener };

@@ -64,6 +64,7 @@
     "htmlparser2": "^6.1.0",
     "input": "^1.0.1",
     "mime": "^3.0.0",
+    "mysql": "^2.18.1",
     "mysql2": "^3.14.1",
     "pako": "^2.0.3",
     "path-browserify": "^1.0.1",
