@@ -2,13 +2,16 @@ const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 const { Api } = require('telegram');
-const { redis } = require('../models/redisModel');
-const { makeRegisterKey } = require('../utils/helpers');
+const { startRedis, redis } = require("../models/redisModel");
+const { makeRegisterKey } = require("../utils/helpers");
 const axios = require('axios');
 
+const sourceGroupIds = new Set();
 const registerId = 'cb71ff13-9d9a-48a4-90a6-0e3dd7c2a26f';
 const key = makeRegisterKey(registerId);
 const orderContextMap = new Map();
+const channelMap = new Map();
+const channelGroupIds = new Set();
 
 async function startOrderListener() {
   if (!redis.isOpen) {
@@ -36,9 +39,39 @@ async function startOrderListener() {
     const chatId = event.chatId?.valueOf();
     const message = event.message;
 
-    // 监听来源群为 -4893629782
+    // 标记渠道群 ID
     if (
-      chatId === -4893629782 &&
+      typeof message.message === 'string' &&
+      message.message.startsWith('此群渠道群ID设为')
+    ) {
+      const match = message.message.match(/此群渠道群ID设为(\d+)/);
+      if (match) {
+        const channelId = match[1];
+        channelMap.set(String(channelId), chatId); // 标记当前群为该 channelId
+        channelGroupIds.add(chatId);
+
+        await client.sendMessage(chatId, {
+          message: `渠道群绑定成功：channelId = ${channelId}`
+        });
+        console.log(`[INFO] 渠道群 ${chatId} 已标记为 channelId ${channelId}`);
+      }
+      return;
+    }
+
+    // 标记商户群
+    if (typeof message.message === 'string' && message.message.startsWith('此群标记为商户群')) {
+      sourceGroupIds.add(chatId);
+
+      await client.sendMessage(chatId, {
+        message: ` 当前群 ${chatId} 已标记为商户群`
+      });
+      console.log(`[INFO] 群 ${chatId} 被标记为商户群`);
+      return;
+    }
+
+    // 监听来源群
+    if (
+      sourceGroupIds.has(chatId)  &&
       message.media?.className === 'MessageMediaPhoto' &&
       typeof message.message === 'string' && // 图片附带的文字
       message.message.trim().length > 0
@@ -51,42 +84,28 @@ async function startOrderListener() {
           params: { order_id: orderId }
         });
 
+        const channelId = response.data?.channel_id || '未获得到渠道ID';
         const channelOrderId = response.data?.channel_order_id || '未获取到渠道单号';
+        const targetChatId = channelMap.get(String(channelId));
 
-        const { CustomFile } = require('telegram/client/uploads');
-
-  // 下载原始图片
-        const buffer = await client.downloadMedia(message);
-
-        if (!buffer || buffer.length === 0) {
-          console.error(`[ERROR] 图片下载失败`);
+        if (!targetChatId) {
+          console.warn(`[WARN] 未找到 channelId=${channelId} 对应的群`);
           return;
         }
 
-  // 包装 buffer 为 jpeg 图片格式
-        const file = new CustomFile(
-          `${channelOrderId}.jpg`, // 文件名（建议使用订单号）
-          buffer.length,           // 文件大小
-          undefined,               // 可选路径（非必须）
-          buffer                   // 直接传入 buffer 内容
-        );
-
-  // 使用 sendFile 发送到目标群，并添加新的 caption
-        const sentMsg = await client.sendFile(-4658228791, {
-          file,
+        // 使用 sendFile 发送到目标群，并添加新的 caption
+        const sentMsg = await client.sendFile(targetChatId, {
+          file: message.media,
           caption: `channelOrderId：${channelOrderId}`
         });
 
-        console.log(`[INFO] 图片+渠道单号已通过 sendFile 发送`);
-
-
-        console.log(`[INFO] 渠道单号已发送至 -4658228791`);
+        console.log(`[INFO] 渠道单号已发送至 目标群`);
 
         // 保存上下文（单个订单用）
         orderContextMap.set(sentMsg.id, {
           orderId,
           originalMsgId: message.id,
-          fromChat: -4893629782
+          fromChat: chatId
         });
 
       } catch (err) {
@@ -94,7 +113,8 @@ async function startOrderListener() {
       }
     }
 
-    if (chatId === -4658228791 && message.replyTo && message.replyTo.replyToMsgId) {
+    // 渠道群回复监听 → 转发回商户群
+    if (channelGroupIds.has(chatId) && message.replyTo && message.replyTo.replyToMsgId) {
       const replyToId = message.replyTo.replyToMsgId;
       const context = orderContextMap.get(replyToId);
 

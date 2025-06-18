@@ -37,8 +37,8 @@ async function listener() {
 
   console.log("Bot is listening for messages...");
 
-  client.addEventHandler(async (event) => {
-    const message = event.message;
+    client.addEventHandler(async (event) => {
+      const message = event.message;
 
     if (message.message.trim().length > 0 && message.chatId.valueOf() === SOURCE_CHAT_ID && message.media?.className === 'MessageMediaPhoto') {
       console.log("Image detected, modifying caption...");
