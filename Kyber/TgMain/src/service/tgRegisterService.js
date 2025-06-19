@@ -5,6 +5,7 @@ const { makeRegisterKey } = require('../utils/helpers');
 const { redis } = require('../models/redisModel');
 const uuid = require('uuid');
 const axios = require('axios');
+const tgAccountService = require('../service/tgAccountService');
 
 
 const flows = {};
@@ -78,33 +79,31 @@ async function doRegisterFlow(registerId) {
     });
 
     const session = client.session.save();
-    await redis.hSet(makeRegisterKey(registerId), { session, status: 'done', isRunning: 'true' });
-    // 打印完整 Redis 存储内容
-    const redisData = await redis.hGetAll(makeRegisterKey(registerId));
-    console.log(`[REDIS STORED DATA]`, redisData);
+    const finalData = await redis.hGetAll(makeRegisterKey(registerId));
+    const Id = registerId.slice(0, 8);
+    // 写入数据库
+    await tgAccountService.createAccount({
+      registerId,
+      Id,
+      api_id: data.apiId,
+      api_hash: data.apiHash,
+      session,
+      is_running: 1,
+      created_at: new Date(),
+      code: finalData.code,
+      phone: finalData.phone,
+      status: 'done',
+    });
+    await redis.hSet(makeRegisterKey(registerId), { status: 'done', isRunning: 'true' });
 
-    // client.addEventHandler(async (event) => {
-    //   if (event.message.senderId?.valueOf() === 8088901247) {
-    //     const msgText = event.message.text || "";
-    //     const fromPeer = await event.message.getInputChat();
-    //     console.log("收到来自 8088901247 的消息：", msgText);
-    //
-    //     await client.forwardMessages(7700169264, {
-    //       messages: [event.message.id],
-    //       fromPeer
-    //     });
-    //
-    //     const reply = msgText.includes("123") ? "成功" : "失败";
-    //     await client.sendMessage(7700169264, { message: reply });
-    //   }
-    // }, new NewMessage({}));
+    console.log(`[SUCCESS] Account saved: ${registerId}`);
   } catch (e) {
-    await redis.hSet(makeRegisterKey(registerId), { status: 'fail', err: e.message });
-    console.error(`[FAIL] Register error: ${registerId}`, e);
+    console.error(`[ERROR] 注册失败 ${registerId}`, e);
   } finally {
     delete flows[registerId];
   }
 }
+
 
 module.exports = {
   initRegister,
