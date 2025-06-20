@@ -75,7 +75,7 @@ async function startOrderListener() {
   console.log('[Telegram] 已连接，监听开始...');
 
   // for testing
-// await disconnectClientById("c2c4474f");
+ await disconnectClientById("a91ffcb3");
 
 }
 
