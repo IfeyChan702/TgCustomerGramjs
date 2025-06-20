@@ -42,8 +42,12 @@ const insertGroupChannel = (tg_account_id, group_id, chat_id, group_name, role, 
     const sql = `INSERT INTO my_database.tg_groups_channel 
             (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+<<<<<<< HEAD
                 ON DUPLICATE KEY UPDATE group_id = VALUES(group_id), group_name = VALUES(group_name), 
                 role = VALUES(role), template_id = VALUES(template_id), created_at = CURRENT_TIMESTAMP`;
+=======
+                ON DUPLICATE KEY UPDATE group_id = VALUES(group_id), group_name = VALUES(group_name), role = VALUES(role), template_id = VALUES(template_id), created_at = CURRENT_TIMESTAMP`;
+>>>>>>> refs/remotes/origin/dev_ming
 
     const values = [tg_account_id, group_id, chat_id, group_name, role, template_id];
 
@@ -70,6 +74,10 @@ const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_
     connection.query(sql, values, (err, result) => {
       if (err) {
         if (err.code === 'ER_DUP_ENTRY') {
+<<<<<<< HEAD
+=======
+          // reject(new Error('Duplicate entry: This tg_account_id and chat_id combination already exists.'));
+>>>>>>> refs/remotes/origin/dev_ming
           resolve(0);
         } else {
           reject(err);
@@ -81,6 +89,28 @@ const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_
   });
 };
 
+<<<<<<< HEAD
+=======
+
+
+// Function to get `chat_id` values for a given `tg_account_id`
+// const getChatIdsByAccountInMerchant = (registerId) => {
+//   return new Promise((resolve, reject) => {
+//     connection.query(
+//       "SELECT chat_id FROM my_database.tg_groups_merchant WHERE tg_account_id = ?",
+//       [registerId],
+//       (error, results) => {
+//         if (error) {
+//           reject(error);
+//         } else {
+//           const merchantGroupIds = new Set(results.map(row => row.chat_id));
+//           resolve(merchantGroupIds);
+//         }
+//       }
+//     );
+//   });
+// };
+>>>>>>> refs/remotes/origin/dev_ming
 const getChatIdsByAccountInMerchant = (registerIdSet) => {
   return new Promise((resolve, reject) => {
     const registerIds = Array.from(registerIdSet);
@@ -103,6 +133,29 @@ const getChatIdsByAccountInMerchant = (registerIdSet) => {
   });
 };
 
+<<<<<<< HEAD
+=======
+
+
+
+// Function to get `chat_id` values for a given `tg_account_id`
+// const getChatIdsByAccountInChannel = (registerId) => {
+//   return new Promise((resolve, reject) => {
+//     connection.query(
+//       "SELECT chat_id FROM my_database.tg_groups_channel WHERE tg_account_id = ?",
+//       [registerId],
+//       (error, results) => {
+//         if (error) {
+//           reject(error);
+//         } else {
+//           const channelGroupIds = new Set(results.map(row => row.chat_id));
+//           resolve(channelGroupIds);
+//         }
+//       }
+//     );
+//   });
+// };
+>>>>>>> refs/remotes/origin/dev_ming
 const getChatIdsByAccountInChannel = (registerIdSet) => {
   return new Promise((resolve, reject) => {
     const registerIds = Array.from(registerIdSet);
@@ -125,6 +178,24 @@ const getChatIdsByAccountInChannel = (registerIdSet) => {
   });
 };
 
+<<<<<<< HEAD
+=======
+
+
+// const getChatIdsByChannelIdInChannel = (channelId) => {
+//   return new Promise((resolve, reject) => {
+//     const sql = "SELECT chat_id FROM tg_groups_channel WHERE group_id = ? ORDER BY created_at DESC"; //" LIMIT 1";
+//
+//     connection.query(sql, [channelId], (error, results) => {
+//       if (error) {
+//         reject(error);
+//       } else {
+//         resolve(results[0]?.chat_id || null); // Return `null` if no results
+//       }
+//     });
+//   });
+// };
+>>>>>>> refs/remotes/origin/dev_ming
 const getChatIdsByChannelIdInChannel = (channelId) => {
   return new Promise((resolve, reject) => {
     const sql = "SELECT chat_id FROM tg_groups_channel WHERE group_id = ? ORDER BY created_at DESC";
@@ -189,6 +260,25 @@ const getLatestAccountIds = async () => {
   });
 };
 
+<<<<<<< HEAD
+=======
+//
+async function getAccountIdfromTelegramId(telegramId) {
+  try {
+    const [rows] = await connection.promise().query(
+      `SELECT id FROM tg_accounts WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 1`,
+      [telegramId]
+    );
+
+    return rows.length > 0 ? rows[0].id : null;
+  } catch (error) {
+    console.error('Error fetching latest ID:', error);
+    return null;
+  }
+}
+
+//
+>>>>>>> refs/remotes/origin/dev_ming
 async function getReplyText(matchRule) {
   try {
     const [rows] = await connection.promise().query(
@@ -203,6 +293,29 @@ async function getReplyText(matchRule) {
   }
 }
 
+<<<<<<< HEAD
 // Export the function
 module.exports = { getReplyText,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray,
   insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
+=======
+
+//Get account from ID
+async function getAccountById(id) {
+  try {
+    const [rows] = await connection.promise().query(
+      `SELECT * FROM tg_accounts WHERE id = ?`,
+      [id]
+    );
+
+    return rows.length > 0 ? rows[0] : null;
+  } catch (error) {
+    console.error('Error fetching account by ID:', error);
+    return null;
+  }
+}
+
+
+
+// Export the function
+module.exports = { getAccountById,getReplyText,getAccountIdfromTelegramId,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray, insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
+>>>>>>> refs/remotes/origin/dev_ming

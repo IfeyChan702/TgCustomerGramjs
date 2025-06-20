@@ -77,7 +77,7 @@ async function doRegisterFlow(registerId) {
       password: () => '',
       onError: (err) => console.log('GramJS Error:', err),
     });
-
+    const me = await client.getMe();
     const session = client.session.save();
     const finalData = await redis.hGetAll(makeRegisterKey(registerId));
     const Id = registerId.slice(0, 8);
@@ -93,6 +93,7 @@ async function doRegisterFlow(registerId) {
       code: finalData.code,
       phone: finalData.phone,
       status: 'done',
+      telegram_id: me.id.valueOf()
     });
     await redis.hSet(makeRegisterKey(registerId), { status: 'done', isRunning: 'true' });
 

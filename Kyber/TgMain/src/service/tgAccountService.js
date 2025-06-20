@@ -25,8 +25,8 @@ exports.createAccount = (account) => {
   return new Promise((resolve, reject) => {
     const sql = `
       INSERT INTO tg_accounts 
-        (registerId, Id, api_id, api_hash, session, is_running, created_at, code, phone, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (registerId, Id, api_id, api_hash, session, is_running, created_at, code, phone, status, telegram_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const values = [
       account.registerId,
@@ -39,6 +39,7 @@ exports.createAccount = (account) => {
       account.code,
       account.phone,
       account.status,
+      account.telegram_id
     ];
 
     db.query(sql, values, (err, result) => {
