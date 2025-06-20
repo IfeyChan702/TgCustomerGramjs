@@ -243,7 +243,7 @@ const getLatestAccountIds = async () => {
   });
 };
 
-
+//
 async function getAccountIdfromTelegramId(telegramId) {
   try {
     const [rows] = await connection.promise().query(
@@ -258,7 +258,7 @@ async function getAccountIdfromTelegramId(telegramId) {
   }
 }
 
-
+//
 async function getReplyText(matchRule) {
   try {
     const [rows] = await connection.promise().query(
