@@ -272,6 +272,8 @@ async function getReplyText(matchRule) {
     return null;
   }
 }
+
+
 //Get account from ID
 async function getAccountById(id) {
   try {

@@ -14,6 +14,7 @@ const channelGroupIds = new Set();
 let AccountId;
 const AccountIdSet = new Set();
 const clients = [];
+const ErrorGroupChatID = -4893629782;
 
 async function startOrderListener() {
 // for testing
@@ -170,6 +171,7 @@ function setupEventHandlers(client) {
 
           if (!targetChatIds.length) {
             console.warn(`[WARN] 未找到 channelId=${channelId} 对应的群`);
+            await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
             return;
           }
 
@@ -219,8 +221,15 @@ function setupEventHandlers(client) {
           const replyContent = message.text || '';
           const replyText = await getReplyText(replyContent);
 
+          if (replyText === null) {
+            await client.sendMessage(context.fromChat, {
+              message: "語料庫沒有記錄",
+              replyTo: context.originalMsgId
+            });
+          }
+
           await client.sendMessage(context.fromChat, {
-            message: replyText !== null ? replyText : (replyContent + "语料库没有") ,
+            message: replyText !== null ? replyText : replyContent,
             replyTo: context.originalMsgId
           });
 
