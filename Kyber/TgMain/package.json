@@ -1,0 +1,14 @@
+{
+  "name": "tgmain",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development node src/index.js",
+    "prod": "cross-env NODE_ENV=production node src/index.js"
+  },
+  "private": true,
+  "dependencies": {
+    "axios": "^1.10.0"
+  }
+}

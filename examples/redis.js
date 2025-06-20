@@ -17,6 +17,11 @@ client.on('error', (err) => console.log('Redis Client Error', err));
     apiHash: '5eb343d4aa291469585740ecccba1852',
     session: '1BQANOTEuMTA4LjU2LjEzNQG7EcK93JrCh3YiNpWU75i5j/ZgfeEq0vk3gIitRN9QD4Sd9idfgHCrpzL5drPDODvOdOb7Y4fFyEFqlgP4ICMVpaGJEUIzEUbf+KuevDkP4MNweeaCTLM00o5H7dJ4Sq7eB0JWiRxFApARUrgoGcI8EG4ClQQfJodoYDKi2Fchub8pMKJvKeaV9XEOj7EwYKvbBHWOD2QA/HGvHGZ0hxFXKc3U/2tQAb83ZI3Lc68G2lET+02MBi+9aDGWXgbwE9P5j62sw0l00ry9uTIXHz1/ePYGSwa+a/Qd+qx6U2I3Ok/oXtfwnVrIISnLcd2OHJuVe+k3IW4/lTKtNn+ZrHf9fQ=='
   });
+  await client.hSet('tg:account:85264395733', {
+    apiId: '25618648',
+    apiHash: 'fd7af9926f68f0724e659c1a096c1f3e',
+    session: '1BQANOTEuMTA4LjU2LjEzNQG7EcK93JrCh3YiNpWU75i5j/ZgfeEq0vk3gIitRN9QD4Sd9idfgHCrpzL5drPDODvOdOb7Y4fFyEFqlgP4ICMVpaGJEUIzEUbf+KuevDkP4MNweeaCTLM00o5H7dJ4Sq7eB0JWiRxFApARUrgoGcI8EG4ClQQfJodoYDKi2Fchub8pMKJvKeaV9XEOj7EwYKvbBHWOD2QA/HGvHGZ0hxFXKc3U/2tQAb83ZI3Lc68G2lET+02MBi+9aDGWXgbwE9P5j62sw0l00ry9uTIXHz1/ePYGSwa+a/Qd+qx6U2I3Ok/oXtfwnVrIISnLcd2OHJuVe+k3IW4/lTKtNn+ZrHf9fQ=='
+  });
   // 读取
   const value = await client.hGetAll('tg:account:85252021856');
   console.log(value);
