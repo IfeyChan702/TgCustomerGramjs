@@ -42,12 +42,7 @@ const insertGroupChannel = (tg_account_id, group_id, chat_id, group_name, role, 
     const sql = `INSERT INTO tg_groups_channel 
             (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-<<<<<<< HEAD
-                ON DUPLICATE KEY UPDATE group_id = VALUES(group_id), group_name = VALUES(group_name), 
-                role = VALUES(role), template_id = VALUES(template_id), created_at = CURRENT_TIMESTAMP`;
-=======
                 ON DUPLICATE KEY UPDATE group_id = VALUES(group_id), group_name = VALUES(group_name), role = VALUES(role), template_id = VALUES(template_id), created_at = CURRENT_TIMESTAMP`;
->>>>>>> refs/remotes/origin/dev_ming
 
     const values = [tg_account_id, group_id, chat_id, group_name, role, template_id];
 
@@ -74,10 +69,7 @@ const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_
     connection.query(sql, values, (err, result) => {
       if (err) {
         if (err.code === 'ER_DUP_ENTRY') {
-<<<<<<< HEAD
-=======
           // reject(new Error('Duplicate entry: This tg_account_id and chat_id combination already exists.'));
->>>>>>> refs/remotes/origin/dev_ming
           resolve(0);
         } else {
           reject(err);
@@ -89,8 +81,6 @@ const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_
   });
 };
 
-<<<<<<< HEAD
-=======
 
 
 // Function to get `chat_id` values for a given `tg_account_id`
@@ -110,7 +100,7 @@ const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_
 //     );
 //   });
 // };
->>>>>>> refs/remotes/origin/dev_ming
+
 const getChatIdsByAccountInMerchant = (registerIdSet) => {
   return new Promise((resolve, reject) => {
     const registerIds = Array.from(registerIdSet);
@@ -133,10 +123,6 @@ const getChatIdsByAccountInMerchant = (registerIdSet) => {
   });
 };
 
-<<<<<<< HEAD
-=======
-
-
 
 // Function to get `chat_id` values for a given `tg_account_id`
 // const getChatIdsByAccountInChannel = (registerId) => {
@@ -155,7 +141,7 @@ const getChatIdsByAccountInMerchant = (registerIdSet) => {
 //     );
 //   });
 // };
->>>>>>> refs/remotes/origin/dev_ming
+
 const getChatIdsByAccountInChannel = (registerIdSet) => {
   return new Promise((resolve, reject) => {
     const registerIds = Array.from(registerIdSet);
@@ -178,9 +164,6 @@ const getChatIdsByAccountInChannel = (registerIdSet) => {
   });
 };
 
-<<<<<<< HEAD
-=======
-
 
 // const getChatIdsByChannelIdInChannel = (channelId) => {
 //   return new Promise((resolve, reject) => {
@@ -195,7 +178,7 @@ const getChatIdsByAccountInChannel = (registerIdSet) => {
 //     });
 //   });
 // };
->>>>>>> refs/remotes/origin/dev_ming
+
 const getChatIdsByChannelIdInChannel = (channelId) => {
   return new Promise((resolve, reject) => {
     const sql = "SELECT chat_id FROM tg_groups_channel WHERE group_id = ? ORDER BY created_at DESC";
@@ -260,8 +243,6 @@ const getLatestAccountIds = async () => {
   });
 };
 
-<<<<<<< HEAD
-=======
 //
 async function getAccountIdfromTelegramId(telegramId) {
   try {
@@ -278,7 +259,6 @@ async function getAccountIdfromTelegramId(telegramId) {
 }
 
 //
->>>>>>> refs/remotes/origin/dev_ming
 async function getReplyText(matchRule) {
   try {
     const [rows] = await connection.promise().query(
@@ -292,12 +272,6 @@ async function getReplyText(matchRule) {
     return null;
   }
 }
-
-<<<<<<< HEAD
-// Export the function
-module.exports = { getReplyText,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray,
-  insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
-=======
 
 //Get account from ID
 async function getAccountById(id) {
@@ -314,8 +288,5 @@ async function getAccountById(id) {
   }
 }
 
-
-
 // Export the function
 module.exports = { getAccountById,getReplyText,getAccountIdfromTelegramId,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray, insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
->>>>>>> refs/remotes/origin/dev_ming
