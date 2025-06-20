@@ -58,13 +58,13 @@ async function startOrderListener() {
     );
 
     await client.connect();
-    console.log(`Client connected: ${data.api_id}`);
+    console.log(`XXXClient connected: ${data.api_id}`);
 
     setupEventHandlers(client);
 
 
     // 防止退出
-    setInterval(() => {}, 60 * 60 * 1000);
+    setInterval(() => {}, 100000);
 
     clients.push({ id: data.Id, client });
   }
@@ -75,7 +75,7 @@ async function startOrderListener() {
   console.log('[Telegram] 已连接，监听开始...');
 
   // for testing
- await disconnectClientById("a91ffcb3");
+ // await disconnectClientById("a91ffcb3");
 
 }
 
@@ -91,7 +91,7 @@ function setupEventHandlers(client) {
     const message = event.message;
     const me = await event._client.getMe();
     const meId = String(me.id);
-    // console.log(me.id); // Prints the ID
+    console.log(me.id); // Prints the ID
     // const me2 = await client.getMe(); // Fetch your own account details
     // console.log(me2.id); // Log your user ID
     const sender = await event.message.senderId;
@@ -100,7 +100,7 @@ function setupEventHandlers(client) {
 
     // 标记渠道群 ID
     if (
-      // meId === senderTelegramID &&
+      meId === senderTelegramID &&
       typeof message.message === 'string' &&
       message.message.startsWith('此群渠道群ID设为') &&
       message.message.includes("监听")
@@ -126,7 +126,7 @@ function setupEventHandlers(client) {
 
     // 标记商户群
     if (
-      // meId === senderTelegramID &&
+      meId === senderTelegramID &&
       typeof message.message === 'string' &&
       message.message.startsWith('此群标记为商户群') &&
       message.message.includes("监听")
@@ -245,7 +245,7 @@ function setupEventHandlers(client) {
   }, new NewMessage({}));
 }
 
-async function disconnectClientById(id) {
+async function stopListener(id) {
   const clientEntry = clients.find(entry => entry.id === id);
   if (!clientEntry) {
     console.warn(`No client found with id: ${id}`);
@@ -262,7 +262,7 @@ async function disconnectClientById(id) {
 }
 
 
-async function connectClientById(Id) {
+async function startListener(Id) {
 
   const data = await getAccountById(Id);
 
@@ -289,3 +289,8 @@ function removeClientById(id) {
     console.warn(`No client found with ID ${id}`);
   }
 }
+
+module.exports = {
+  startListener,
+  stopListener
+};
