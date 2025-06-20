@@ -13,6 +13,7 @@ const channelMap = new Map();
 const channelGroupIds = new Set();
 let AccountId;
 const AccountIdSet = new Set();
+const clients = [];
 
 async function startOrderListener() {
 
@@ -44,7 +45,7 @@ async function startOrderListener() {
   //
   // await client.connect();
 
-  const clients = [];
+
   for (const data of accountDetails) {
     const client = new TelegramClient(
       new StringSession(data.session),
@@ -226,3 +227,5 @@ async function startOrderListener() {
 }
 
 startOrderListener().catch(console.error);
+
+
