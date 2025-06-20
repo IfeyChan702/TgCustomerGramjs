@@ -4,7 +4,7 @@ const connection = require("../models/mysqlModel");
 const getTopRegisterId = () => {
   return new Promise((resolve, reject) => {
     connection.query(
-      "SELECT registerId FROM my_database.tg_accounts LIMIT 1 OFFSET 1",
+      "SELECT registerId FROM tg_accounts LIMIT 1 OFFSET 1",
       (error, results) => {
         if (error) {
           reject(error);
@@ -23,7 +23,7 @@ const getAccountByRegisterIdArray = (registerIds) => {
       return reject(new Error("registerIds must be a non-empty array"));
     }
 
-    const sql = `SELECT * FROM my_database.tg_accounts WHERE registerId IN (?)`;
+    const sql = `SELECT * FROM tg_accounts WHERE registerId IN (?)`;
 
     connection.query(sql, [registerIds], (error, results) => {
       if (error) {
@@ -39,7 +39,7 @@ const getAccountByRegisterIdArray = (registerIds) => {
 // Function to insert data into `tg_groups_channel`
 const insertGroupChannel = (tg_account_id, group_id, chat_id, group_name, role, template_id) => {
   return new Promise((resolve, reject) => {
-    const sql = `INSERT INTO my_database.tg_groups_channel 
+    const sql = `INSERT INTO tg_groups_channel 
             (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON DUPLICATE KEY UPDATE group_id = VALUES(group_id), group_name = VALUES(group_name), role = VALUES(role), template_id = VALUES(template_id), created_at = CURRENT_TIMESTAMP`;
@@ -60,7 +60,7 @@ const insertGroupChannel = (tg_account_id, group_id, chat_id, group_name, role, 
 // Function to insert data into `tg_groups_merchant`
 const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_id) => {
   return new Promise((resolve, reject) => {
-    const sql = `INSERT INTO my_database.tg_groups_merchant
+    const sql = `INSERT INTO tg_groups_merchant
             (tg_account_id, chat_id, group_name, role, template_id, created_at)
             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`;
 
@@ -87,7 +87,7 @@ const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_
 // const getChatIdsByAccountInMerchant = (registerId) => {
 //   return new Promise((resolve, reject) => {
 //     connection.query(
-//       "SELECT chat_id FROM my_database.tg_groups_merchant WHERE tg_account_id = ?",
+//       "SELECT chat_id FROM tg_groups_merchant WHERE tg_account_id = ?",
 //       [registerId],
 //       (error, results) => {
 //         if (error) {
@@ -109,7 +109,7 @@ const getChatIdsByAccountInMerchant = (registerIdSet) => {
     }
 
     const placeholders = registerIds.map(() => '?').join(', ');
-    const sql = `SELECT chat_id FROM my_database.tg_groups_merchant WHERE tg_account_id IN (${placeholders})`;
+    const sql = `SELECT chat_id FROM tg_groups_merchant WHERE tg_account_id IN (${placeholders})`;
 
     connection.query(sql, registerIds, (error, results) => {
       if (error) {
@@ -129,7 +129,7 @@ const getChatIdsByAccountInMerchant = (registerIdSet) => {
 // const getChatIdsByAccountInChannel = (registerId) => {
 //   return new Promise((resolve, reject) => {
 //     connection.query(
-//       "SELECT chat_id FROM my_database.tg_groups_channel WHERE tg_account_id = ?",
+//       "SELECT chat_id FROM tg_groups_channel WHERE tg_account_id = ?",
 //       [registerId],
 //       (error, results) => {
 //         if (error) {
@@ -151,7 +151,7 @@ const getChatIdsByAccountInChannel = (registerIdSet) => {
     }
 
     const placeholders = registerIds.map(() => '?').join(', ');
-    const sql = `SELECT chat_id FROM my_database.tg_groups_channel WHERE tg_account_id IN (${placeholders})`;
+    const sql = `SELECT chat_id FROM tg_groups_channel WHERE tg_account_id IN (${placeholders})`;
 
     connection.query(sql, registerIds, (error, results) => {
       if (error) {
@@ -200,10 +200,10 @@ const getLatestRegisterIds = async () => {
   return new Promise((resolve, reject) => {
     const sql = `
         SELECT t1.registerId
-        FROM my_database.tg_accounts t1
+        FROM tg_accounts t1
                  JOIN (
             SELECT phone, MAX(created_at) AS latest_created_at
-            FROM my_database.tg_accounts
+            FROM tg_accounts
             WHERE is_running = 1
             GROUP BY phone
         ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at;
@@ -224,10 +224,10 @@ const getLatestAccountIds = async () => {
   return new Promise((resolve, reject) => {
     const sql = `
         SELECT t1.id
-        FROM my_database.tg_accounts t1
+        FROM tg_accounts t1
                  JOIN (
             SELECT phone, MAX(created_at) AS latest_created_at
-            FROM my_database.tg_accounts
+            FROM tg_accounts
             WHERE is_running = 1
             GROUP BY phone
         ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at;
