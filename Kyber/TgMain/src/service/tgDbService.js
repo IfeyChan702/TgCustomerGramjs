@@ -272,6 +272,22 @@ async function getReplyText(matchRule) {
     return null;
   }
 }
+//Get account from ID
+async function getAccountById(id) {
+  try {
+    const [rows] = await connection.promise().query(
+      `SELECT * FROM tg_accounts WHERE id = ?`,
+      [id]
+    );
+
+    return rows.length > 0 ? rows[0] : null;
+  } catch (error) {
+    console.error('Error fetching account by ID:', error);
+    return null;
+  }
+}
+
+
 
 // Export the function
-module.exports = { getReplyText,getAccountIdfromTelegramId,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray, insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
+module.exports = { getAccountById,getReplyText,getAccountIdfromTelegramId,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray, insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
