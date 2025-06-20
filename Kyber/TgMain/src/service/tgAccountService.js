@@ -1,5 +1,6 @@
-// const { stopListener, startListener } = require('./tgListenerService');
+const { stopListener, startListener } = require('./tgListenerService');
 const db = require('../models/mysqlModel');
+
 
 // 查询所有账户，支持关键词模糊搜索（模糊匹配 registerId、phone、status）
 exports.getAllAccounts = (keyword = '') => {
@@ -64,8 +65,10 @@ exports.updateAccount = async (registerId, account) => {
 
       // 根据 is_running 控制监听
       try {
+        const Id = registerId.slice(0, 8);
         if (Number(account.is_running) === 0) {
-          await stopListener(registerId);
+          // await stopListener(registerId);
+          await stopListener(Id);
           console.log(`[监听] 已关闭: ${registerId}`);
         } else if (Number(account.is_running) === 1) {
           // 获取完整数据以重启监听
@@ -76,12 +79,13 @@ exports.updateAccount = async (registerId, account) => {
               if (fetchErr) return reject(fetchErr);
               const user = rows[0];
               if (user) {
-                await startListener({
-                  registerId,
-                  apiId: user.api_id,
-                  apiHash: user.api_hash,
-                  session: user.session,
-                });
+                // await startListener({
+                //   registerId,
+                //   apiId: user.api_id,
+                //   apiHash: user.api_hash,
+                //   session: user.session,
+                // });
+                await startListener(Id);
                 console.log(`[监听] 已开启: ${registerId}`);
               }
             }
