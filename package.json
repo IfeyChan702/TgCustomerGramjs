@@ -60,6 +60,8 @@
     "axios": "^1.10.0",
     "big-integer": "^1.6.48",
     "buffer": "^6.0.3",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "htmlparser2": "^6.1.0",
     "input": "^1.0.1",
