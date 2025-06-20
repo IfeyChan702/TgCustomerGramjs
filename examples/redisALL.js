@@ -31,14 +31,14 @@ async function getAllRedisData() {
   return result;
 }
 
-// Example usage:
-getAllRedisData().then(data => console.log("Redis Data:", data));
+
 
 // const { createClient } = require("redis");
 
 async function clearRedisData() {
-  const client = createClient({ url: "redis://localhost:6379" });
-
+  const client = createClient({
+    url: "redis://:test123456@192.168.3.77:44513" // Change this if needed
+  });
   await client.connect();
 
   await client.flushAll(); // Clears all Redis databases
@@ -47,5 +47,30 @@ async function clearRedisData() {
   await client.disconnect();
 }
 
-// Example usage
+async function clearSpecificRedisData() {
+  const client = createClient({
+    url: "redis://:test123456@192.168.3.77:44513" // Adjust credentials if needed
+  });
+
+  await client.connect();
+
+  const registerKey = await client.keys("*"); // Get all keys (modify as needed)
+
+  for (const key of registerKey) {
+    const phoneValue = await client.hGet(key, "phone"); // Retrieve the 'phone' field
+
+    if (phoneValue === "+918302444254") {
+      await client.del(key); // Delete the entire key if phone matches
+      console.log(`Deleted Redis key: ${key}`);
+    }
+  }
+
+  await client.disconnect();
+  console.log("Finished clearing specific Redis data.");
+}
+
+
+// Example usage:
+// getAllRedisData().then(data => console.log("Redis Data:", data));
 // clearRedisData();
+clearSpecificRedisData();
