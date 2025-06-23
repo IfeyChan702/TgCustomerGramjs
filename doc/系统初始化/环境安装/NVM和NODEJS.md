@@ -17,10 +17,10 @@ Node 安装目录：C:\Program Files\nodejs
 
 
 安装最新 Node.js
+v22.11.0
+nvm install 22.11.0
 
-nvm install 24.2.0
-
-nvm use 24.2.0
+nvm use 22.11.0
 
 
 安装 nvm（Node Version Manager） ubuntu
@@ -41,6 +41,6 @@ source ~/.zshrc
 nvm ls-remote
 
 # 步骤 4：安装最新版本的 Node.js
-nvm use 24.2.0
+nvm use 22.11.0
 
 
