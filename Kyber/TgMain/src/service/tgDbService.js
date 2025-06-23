@@ -1,292 +1,165 @@
 const connection = require("../models/mysqlModel");
 
-// Function to get the top registerId
-const getTopRegisterId = () => {
+/**
+ * 工具函数：Promise风格的MySQL查询
+ */
+function queryAsync(sql, params) {
   return new Promise((resolve, reject) => {
-    connection.query(
-      "SELECT registerId FROM tg_accounts LIMIT 1 OFFSET 1",
-      (error, results) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(results[0]?.registerId);
-        }
-      }
-    );
-  });
-};
-
-// Function to get account details based on registerId
-const getAccountByRegisterIdArray = (registerIds) => {
-  return new Promise((resolve, reject) => {
-    if (!Array.isArray(registerIds) || registerIds.length === 0) {
-      return reject(new Error("registerIds must be a non-empty array"));
-    }
-
-    const sql = `SELECT * FROM tg_accounts WHERE registerId IN (?)`;
-
-    connection.query(sql, [registerIds], (error, results) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(results);
-      }
+    connection.query(sql, params, (err, results) => {
+      if (err) reject(err);
+      else resolve(results);
     });
   });
+}
+
+/**
+ * 获取第二条 registerId
+ */
+const getTopRegisterId = async () => {
+  const results = await queryAsync("SELECT registerId FROM tg_accounts LIMIT 1 OFFSET 1");
+  return results[0]?.registerId;
 };
 
-
-// Function to insert data into `tg_groups_channel`
-const insertGroupChannel = (tg_account_id, group_id, chat_id, group_name, role, template_id) => {
-  return new Promise((resolve, reject) => {
-    const sql = `INSERT INTO tg_groups_channel 
-            (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON DUPLICATE KEY UPDATE group_id = VALUES(group_id), group_name = VALUES(group_name), role = VALUES(role), template_id = VALUES(template_id), created_at = CURRENT_TIMESTAMP`;
-
-    const values = [tg_account_id, group_id, chat_id, group_name, role, template_id];
-
-    connection.query(sql, values, (err, result) => {
-      if (err) {
-        reject(err);
-      } else {
-        // If update happens, MySQL sets affectedRows to 2 (1 insert + 1 update)
-        resolve(result.affectedRows > 1 ? 0 : result.insertId);
-      }
-    });
-  });
+/**
+ * 根据 registerId 数组获取账号信息
+ */
+const getAccountByRegisterIdArray = async (registerIds) => {
+  if (!Array.isArray(registerIds) || !registerIds.length) throw new Error("registerIds must be a non-empty array");
+  const results = await queryAsync(`SELECT * FROM tg_accounts WHERE registerId IN (?)`, [registerIds]);
+  return results;
 };
 
-// Function to insert data into `tg_groups_merchant`
-const insertGroupMerchant = (tg_account_id, chat_id, group_name, role, template_id) => {
-  return new Promise((resolve, reject) => {
-    const sql = `INSERT INTO tg_groups_merchant
-            (tg_account_id, chat_id, group_name, role, template_id, created_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`;
+/**
+ * 插入/更新群组-频道信息
+ */
+const insertGroupChannel = async (tg_account_id, group_id, chat_id, group_name, role, template_id) => {
+  const sql = `
+    INSERT INTO tg_groups_channel 
+    (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON DUPLICATE KEY UPDATE group_id=VALUES(group_id), group_name=VALUES(group_name), 
+    role=VALUES(role), template_id=VALUES(template_id), created_at=CURRENT_TIMESTAMP
+  `;
+  const values = [tg_account_id, group_id, chat_id, group_name, role, template_id];
+  const result = await queryAsync(sql, values);
+  // MySQL affectedRows=2 表示更新，=1为插入
+  return result.affectedRows > 1 ? 0 : result.insertId;
+};
 
+/**
+ * 插入商户群信息（唯一性冲突返回0）
+ */
+const insertGroupMerchant = async (tg_account_id, chat_id, group_name, role, template_id) => {
+  try {
+    const sql = `
+      INSERT INTO tg_groups_merchant
+      (tg_account_id, chat_id, group_name, role, template_id, created_at)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `;
     const values = [tg_account_id, chat_id, group_name, role, template_id];
-
-    connection.query(sql, values, (err, result) => {
-      if (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-          // reject(new Error('Duplicate entry: This tg_account_id and chat_id combination already exists.'));
-          resolve(0);
-        } else {
-          reject(err);
-        }
-      } else {
-        resolve(result.insertId);
-      }
-    });
-  });
+    const result = await queryAsync(sql, values);
+    return result.insertId;
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return 0;
+    throw err;
+  }
 };
 
-
-
-// Function to get `chat_id` values for a given `tg_account_id`
-// const getChatIdsByAccountInMerchant = (registerId) => {
-//   return new Promise((resolve, reject) => {
-//     connection.query(
-//       "SELECT chat_id FROM tg_groups_merchant WHERE tg_account_id = ?",
-//       [registerId],
-//       (error, results) => {
-//         if (error) {
-//           reject(error);
-//         } else {
-//           const merchantGroupIds = new Set(results.map(row => row.chat_id));
-//           resolve(merchantGroupIds);
-//         }
-//       }
-//     );
-//   });
-// };
-
-const getChatIdsByAccountInMerchant = (registerIdSet) => {
-  return new Promise((resolve, reject) => {
-    const registerIds = Array.from(registerIdSet);
-
-    if (registerIds.length === 0) {
-      return resolve(new Set()); // No IDs provided, return empty Set
-    }
-
-    const placeholders = registerIds.map(() => '?').join(', ');
-    const sql = `SELECT chat_id FROM tg_groups_merchant WHERE tg_account_id IN (${placeholders})`;
-
-    connection.query(sql, registerIds, (error, results) => {
-      if (error) {
-        reject(error);
-      } else {
-        const merchantGroupIds = new Set(results.map(row => row.chat_id));
-        resolve(merchantGroupIds);
-      }
-    });
-  });
+/**
+ * 根据 accountId Set 查找 tg_groups_merchant 表中 chat_id Set
+ */
+const getChatIdsByAccountInMerchant = async (registerIdSet) => {
+  if (!registerIdSet || !registerIdSet.size) return new Set();
+  const ids = Array.from(registerIdSet);
+  const sql = `SELECT chat_id FROM tg_groups_merchant WHERE tg_account_id IN (${ids.map(() => '?').join(',')})`;
+  const results = await queryAsync(sql, ids);
+  return new Set(results.map(row => row.chat_id));
 };
 
-
-// Function to get `chat_id` values for a given `tg_account_id`
-// const getChatIdsByAccountInChannel = (registerId) => {
-//   return new Promise((resolve, reject) => {
-//     connection.query(
-//       "SELECT chat_id FROM tg_groups_channel WHERE tg_account_id = ?",
-//       [registerId],
-//       (error, results) => {
-//         if (error) {
-//           reject(error);
-//         } else {
-//           const channelGroupIds = new Set(results.map(row => row.chat_id));
-//           resolve(channelGroupIds);
-//         }
-//       }
-//     );
-//   });
-// };
-
-const getChatIdsByAccountInChannel = (registerIdSet) => {
-  return new Promise((resolve, reject) => {
-    const registerIds = Array.from(registerIdSet);
-
-    if (registerIds.length === 0) {
-      return resolve(new Set()); // No IDs provided, return empty Set
-    }
-
-    const placeholders = registerIds.map(() => '?').join(', ');
-    const sql = `SELECT chat_id FROM tg_groups_channel WHERE tg_account_id IN (${placeholders})`;
-
-    connection.query(sql, registerIds, (error, results) => {
-      if (error) {
-        reject(error);
-      } else {
-        const channelGroupIds = new Set(results.map(row => row.chat_id));
-        resolve(channelGroupIds);
-      }
-    });
-  });
+/**
+ * 根据 accountId Set 查找 tg_groups_channel 表中 chat_id Set
+ */
+const getChatIdsByAccountInChannel = async (registerIdSet) => {
+  if (!registerIdSet || !registerIdSet.size) return new Set();
+  const ids = Array.from(registerIdSet);
+  const sql = `SELECT chat_id FROM tg_groups_channel WHERE tg_account_id IN (${ids.map(() => '?').join(',')})`;
+  const results = await queryAsync(sql, ids);
+  return new Set(results.map(row => row.chat_id));
 };
 
-
-// const getChatIdsByChannelIdInChannel = (channelId) => {
-//   return new Promise((resolve, reject) => {
-//     const sql = "SELECT chat_id FROM tg_groups_channel WHERE group_id = ? ORDER BY created_at DESC"; //" LIMIT 1";
-//
-//     connection.query(sql, [channelId], (error, results) => {
-//       if (error) {
-//         reject(error);
-//       } else {
-//         resolve(results[0]?.chat_id || null); // Return `null` if no results
-//       }
-//     });
-//   });
-// };
-
-const getChatIdsByChannelIdInChannel = (channelId) => {
-  return new Promise((resolve, reject) => {
-    const sql = "SELECT chat_id FROM tg_groups_channel WHERE group_id = ? ORDER BY created_at DESC";
-
-    connection.query(sql, [channelId], (error, results) => {
-      if (error) {
-        reject(error);
-      } else {
-        const chatIds = results.map(row => row.chat_id); // Extract all chat_id values
-        resolve(chatIds); // Returns an array (could be empty)
-      }
-    });
-  });
+/**
+ * 查找 channelId 在 tg_groups_channel 表中的所有 chat_id（按创建时间倒序）
+ */
+const getChatIdsByChannelIdInChannel = async (channelId) => {
+  const sql = "SELECT chat_id FROM tg_groups_channel WHERE group_id = ? ORDER BY created_at DESC";
+  const results = await queryAsync(sql, [channelId]);
+  return results.map(row => row.chat_id);
 };
 
-
-// Function to get latest register IDs
+/**
+ * 查找 is_running=1 且每个 phone 最新创建的 registerId
+ */
 const getLatestRegisterIds = async () => {
-  return new Promise((resolve, reject) => {
-    const sql = `
-        SELECT t1.registerId
-        FROM tg_accounts t1
-                 JOIN (
-            SELECT phone, MAX(created_at) AS latest_created_at
-            FROM tg_accounts
-            WHERE is_running = 1
-            GROUP BY phone
-        ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at;
-        `;
-
-    connection.query(sql, (error, results) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(results.map(row => row.registerId));
-      }
-    });
-  });
+  const sql = `
+    SELECT t1.registerId
+    FROM tg_accounts t1
+    JOIN (
+      SELECT phone, MAX(created_at) AS latest_created_at
+      FROM tg_accounts
+      WHERE is_running = 1
+      GROUP BY phone
+    ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
+  `;
+  const results = await queryAsync(sql);
+  return results.map(row => row.registerId);
 };
 
-// Function to get latest register IDs
+/**
+ * 查找 is_running=1 且每个 phone 最新创建的 id
+ */
 const getLatestAccountIds = async () => {
-  return new Promise((resolve, reject) => {
-    const sql = `
-        SELECT t1.id
-        FROM tg_accounts t1
-                 JOIN (
-            SELECT phone, MAX(created_at) AS latest_created_at
-            FROM tg_accounts
-            WHERE is_running = 1
-            GROUP BY phone
-        ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at;
-        `;
-
-    connection.query(sql, (error, results) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(results);
-      }
-    });
-  });
+  const sql = `
+    SELECT t1.id
+    FROM tg_accounts t1
+    JOIN (
+      SELECT phone, MAX(created_at) AS latest_created_at
+      FROM tg_accounts
+      WHERE is_running = 1
+      GROUP BY phone
+    ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
+  `;
+  return await queryAsync(sql);
 };
 
-//
-async function getAccountIdfromTelegramId(telegramId) {
-  try {
-    const [rows] = await connection.promise().query(
-      `SELECT id FROM tg_accounts WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 1`,
-      [telegramId]
-    );
+/**
+ * 查找回复文本（根据匹配规则）
+ */
+const getReplyText = async (matchRule) => {
+  const sql = `SELECT reply_text FROM tg_reply WHERE match_rule = ? LIMIT 1`;
+  const results = await queryAsync(sql, [matchRule]);
+  return results.length > 0 ? results[0].reply_text : null;
+};
 
-    return rows.length > 0 ? rows[0].id : null;
-  } catch (error) {
-    console.error('Error fetching latest ID:', error);
-    return null;
-  }
-}
+/**
+ * 根据 id 查找账户信息
+ */
+const getAccountById = async (id) => {
+  const sql = `SELECT * FROM tg_accounts WHERE id = ?`;
+  const results = await queryAsync(sql, [id]);
+  return results.length > 0 ? results[0] : null;
+};
 
-//
-async function getReplyText(matchRule) {
-  try {
-    const [rows] = await connection.promise().query(
-      `SELECT reply_text FROM tg_reply WHERE match_rule = ? LIMIT 1`,
-      [matchRule]
-    );
-
-    return rows.length > 0 ? rows[0].reply_text : null;
-  } catch (error) {
-    console.error('Error fetching reply text:', error);
-    return null;
-  }
-}
-
-//Get account from ID
-async function getAccountById(id) {
-  try {
-    const [rows] = await connection.promise().query(
-      `SELECT * FROM tg_accounts WHERE id = ?`,
-      [id]
-    );
-
-    return rows.length > 0 ? rows[0] : null;
-  } catch (error) {
-    console.error('Error fetching account by ID:', error);
-    return null;
-  }
-}
-
-// Export the function
-module.exports = { getAccountById,getReplyText,getAccountIdfromTelegramId,getLatestAccountIds,getLatestRegisterIds ,getTopRegisterId, getAccountByRegisterIdArray, insertGroupChannel, getChatIdsByAccountInChannel,getChatIdsByAccountInMerchant,insertGroupMerchant,getChatIdsByChannelIdInChannel };
+// 统一导出
+module.exports = {
+  getTopRegisterId,
+  getAccountByRegisterIdArray,
+  insertGroupChannel,
+  insertGroupMerchant,
+  getChatIdsByAccountInMerchant,
+  getChatIdsByAccountInChannel,
+  getChatIdsByChannelIdInChannel,
+  getLatestRegisterIds,
+  getLatestAccountIds,
+  getReplyText,
+  getAccountById,
+};
