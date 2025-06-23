@@ -91,7 +91,7 @@ function setupEventHandlers(client) {
           });
           return;
         }
-
+//需要修改
         const count_chat_id = await getChannelChatIdCountExcludingAccount(chatId, AccountId);
         if (count_chat_id!==0){
           await client.sendMessage(chatId, {
@@ -120,7 +120,7 @@ function setupEventHandlers(client) {
       const match = message.message.match(/此群标记为商户群由(.+?)监听/);
       if (match) {
         AccountId = match[1];
-
+//需要修改
         const count_chat_id = await getMerchantChatIdCountExcludingAccount(chatId, AccountId);
         if (count_chat_id!==0){
           await client.sendMessage(chatId, {
