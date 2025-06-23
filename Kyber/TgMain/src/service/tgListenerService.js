@@ -185,7 +185,7 @@ function setupEventHandlers(client) {
           if (replyText === null) {
 
             await client.sendMessage(ErrorGroupChatID, {
-              message: `語料庫沒有記錄`,
+              message: `[WARN] 語料庫沒有記錄 ` + replyContent,
             });
           }
 
