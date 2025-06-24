@@ -132,8 +132,8 @@ async function handleMarkMerchantGroup(client, chatId, chatTitle, text) {
 
   // 检查 chatId 唯一性
   if (await tgDbService.getMerchantChatIdCountExcludingAccount(chatId, accountId) !== 0) {
-    await client.sendMessage(chatId, { message: `請勿重覆綁定` });
-    console.log(`請勿重覆綁定`);
+    await client.sendMessage(chatId, { message: `请勿重复绑定` });
+    console.log(`请勿重复绑定`);
     return;
   }
 
@@ -203,9 +203,9 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
 
     if (replyText === null) {
       await client.sendMessage(ErrorGroupChatID, {
-        message: `[WARN] 語料庫沒有記錄 ${replyContent}, Chat ID :${chatId}, Chat Name :${chatTitle}`,
+        message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`,
       });
-      console.log(`[WARN] 語料庫沒有記錄 ${replyContent}, Chat ID :${chatId}, Chat Name :${chatTitle}`);
+      console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
     }
     await client.sendMessage(context.fromChat, {
       message: replyText !== null ? replyText : replyContent,
@@ -222,15 +222,15 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
 async function stopListener(id) {
   const clientEntry = clients.find(entry => entry.id === id);
   if (!clientEntry) {
-    console.warn(`No client found with id: ${id}`);
+    console.warn(`用户不存在: ${id}`);
     return;
   }
   try {
     await clientEntry.client.disconnect();
     removeClientById(id);
-    console.log(`Client manually disconnected: ${id}`);
+    console.log(`用户连接断开: ${id}`);
   } catch (err) {
-    console.error(`Failed to disconnect client with id ${id}:`, err);
+    console.error(`断开失败 ${id}:`, err);
   }
 }
 
@@ -243,7 +243,7 @@ async function startListener(id) {
     { connectionRetries: 5 }
   );
   await client.connect();
-  console.log(`Client connected at runtime: ${data.api_id}`);
+  console.log(`用户连接成功: ${data.api_id}`);
   setupEventHandlers(client);
   clients.push({ id: data.Id, client });
 }
@@ -252,9 +252,9 @@ function removeClientById(id) {
   const idx = clients.findIndex(entry => entry.id === id);
   if (idx !== -1) {
     clients.splice(idx, 1);
-    console.log(`Client with ID ${id} removed from the list`);
+    console.log(`用户被移除 ${id}`);
   } else {
-    console.warn(`No client found with ID ${id}`);
+    console.warn(`用户未找到 ${id}`);
   }
 }
 
