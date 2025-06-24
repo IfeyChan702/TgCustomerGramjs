@@ -4,300 +4,261 @@ const { NewMessage } = require('telegram/events');
 const { Api } = require('telegram');
 const { startRedis, redis } = require("../models/redisModel");
 const axios = require('axios');
-const {getAccountIdsByChatIdInMerchant,getAccountIdByTelegramId,getAllAccountIdsInMerchant,getAllChatIdsInChannel,getAllChatIdsInMerchant,getMerchantChatIdCountExcludingAccount,getChannelChatIdCountExcludingAccount,getGroupAccountChannelCount,getGroupIdChannelCount,getAccountById,getReplyText,getLatestRegisterIds , getAccountByRegisterIdArray ,insertGroupChannel, getChatIdsByAccountInChannel, getChatIdsByAccountInMerchant, insertGroupMerchant, getChatIdsByChannelIdInChannel} = require("./tgDbService");
+const tgDbService = require("./tgDbService");
 
 const orderContextMap = new Map();
-let AccountId;
-const AccountIdSet = new Set();
 const clients = [];
 const ErrorGroupChatID = -4750453063;
 
+// 启动所有账户监听
 async function startOrderListener() {
+  const registerIds = await tgDbService.getLatestRegisterIds();
+  const accountDetails = await tgDbService.getAccountByRegisterIdArray(registerIds);
 
-  const registerId = await getLatestRegisterIds();
-  const accountDetails = await getAccountByRegisterIdArray(registerId);
-
-
-  const isMissingValues = accountDetails.some(account =>
-    !account.session || !account.api_id || !account.api_hash
-  );
+  const isMissingValues = accountDetails.some(acc => !acc.session || !acc.api_id || !acc.api_hash);
   if (isMissingValues) {
     console.error(`[ERROR] 无法启动监听，registerId 数据不完整`);
     return;
   }
 
-  for (const data of accountDetails) {
+  for (const acc of accountDetails) {
     const client = new TelegramClient(
-      new StringSession(data.session),
-      Number(data.api_id),
-      data.api_hash,
+      new StringSession(acc.session),
+      Number(acc.api_id),
+      acc.api_hash,
       { connectionRetries: 5 }
     );
-
     await client.connect();
-    console.log(`XXXClient connected: ${data.api_id}`);
-
+    console.log(`[INFO] Client connected: ${acc.api_id}`);
     setupEventHandlers(client);
-
-
-    // 防止退出
+    // 防止进程自动退出
     setInterval(() => {}, 100000);
-
-    clients.push({ id: data.Id, client });
+    clients.push({ id: acc.Id, client });
   }
 
-  console.log("All clients are connected and listening for events!");
-
-
-  console.log('[Telegram] 已连接，监听开始...');
-
+  console.log("[Telegram] 所有账号监听已启动");
 }
 
 startOrderListener().catch(console.error);
 
+// ================= 监听事件主逻辑 ===================
 function setupEventHandlers(client) {
   client.addEventHandler(async (event) => {
-
-    const chatId = event.chatId?.valueOf();
-    // Fetch chat details
-    const chat = await client.getEntity(chatId);
-    const chatTitle = chat.title;
-    const message = event.message;
-    const me = await event._client.getMe();
-    const meId = String(me.id);
-    // console.log(me.id); // Prints the ID
-    const me2 = await client.getMe(); // Fetch your own account details
-    // console.log(me2.id); // Log your user ID
-    const sender = await event.message.senderId;
-    const senderTelegramID = String(sender) ;
-
-    // 标记渠道群 ID
-    if (
-      meId === senderTelegramID &&
-      typeof message.message === 'string' &&
-      message.message.startsWith('此群渠道群ID设为') &&
-      message.message.includes("监听")
-    ) {
-
-      const match = message.message.match(/此群渠道群ID设为(\d+)由(.+?)监听/);
-      if (match) {
-        const channelId = match[1];
-        AccountId = match[2];
-
-        const count_group_id = await getGroupAccountChannelCount(channelId, AccountId);
-        if (count_group_id!==0){
-          await client.sendMessage(chatId, {
-            message: `渠道ID 重覆了`,
-          });
-          // 需要修改
-          console.log(`渠道ID 重覆了`);
-          return;
-        }
-
-        const count_group_id_2 = await getGroupIdChannelCount(channelId);
-        if (count_group_id_2!==0){
-          await client.sendMessage(chatId, {
-            message: `渠道ID 重覆了`,
-          });
-          // 需要修改
-          console.log(`渠道ID 重覆了`);
-          return;
-        }
-//需要修改
-        const count_chat_id = await getChannelChatIdCountExcludingAccount(chatId, AccountId);
-        if (count_chat_id!==0){
-          await client.sendMessage(chatId, {
-            message: `請勿重覆綁定`,
-          });
-          // 需要修改
-          console.log(`請勿重覆綁定`);
-          return;
-        }
-
-        AccountIdSet.add(AccountId);
-        await insertGroupChannel(AccountId, String(channelId), chatId, chatTitle, "channel", 1);
-        await client.sendMessage(chatId, {
-          message: `渠道群绑定成功：渠道Id = ${channelId}, 由 ${AccountId} 机器人监听`,
-        });
-        console.log(`[INFO] 渠道群 ${chatId} 已标记为 channelId ${channelId}, 由 ${AccountId} 机器人监听`);
-      }
-      return;
-    }
-
-    // 标记商户群
-    if (
-      meId === senderTelegramID &&
-      typeof message.message === 'string' &&
-      message.message.startsWith('此群标记为商户群') &&
-      message.message.includes("监听")
-    ) {
-      const match = message.message.match(/此群标记为商户群由(.+?)监听/);
-      if (match) {
-        AccountId = match[1];
-//需要修改
-        const count_chat_id = await getMerchantChatIdCountExcludingAccount(chatId, AccountId);
-        if (count_chat_id!==0){
-          await client.sendMessage(chatId, {
-            message: `請勿重覆綁定`,
-          });
-          // 需要修改
-          console.log(`請勿重覆綁定`);
-          return;
-        }
-
-        AccountIdSet.add(AccountId);
-        await insertGroupMerchant(AccountId, chatId, chatTitle, "merchant", 1);
-        await client.sendMessage(chatId, {
-          message: ` 当前群 ${chatId} 已标记为商户群, 由 ${AccountId} 机器人监听`
-        });
-        console.log(`[INFO] 群 ${chatId} 被标记为商户群, 由 ${AccountId} 机器人监听`);
-      }
-      return;
-    }
-
-    // 监听来源群
-    if (
-      // meId === senderTelegramID  &&
-      message.media?.className === 'MessageMediaPhoto' &&
-      typeof message.message === 'string' && // 图片附带的文字
-      message.message.trim().length > 0
-    ) {
-      const relevantAccountIds = await getAccountIdsByChatIdInMerchant(chatId);
-      const AccountIdfromClientID = await getAccountIdByTelegramId(meId);
-      // const sourceGroupIds = await getChatIdsByAccountInMerchant(AccountIdSet);
-      const sourceGroupIds = await getAllChatIdsInMerchant();
-      if(sourceGroupIds.has(String(chatId)) && relevantAccountIds.has(AccountIdfromClientID)){
-
-        const orderId = message.message.trim();
-        console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
-
-        try {
-          const response = await axios.get(`https://bi.humideah.com/bi/payin/check`, {
-            params: { order_id: orderId }
-          });
-
-          const channelId = response.data?.channel_id || '未获得到渠道ID';
-          const channelOrderId = response.data?.channel_order_id || '未获取到渠道单号';
-          const targetChatIds = await getChatIdsByChannelIdInChannel(String(channelId));
-
-          if (!targetChatIds.length) {
-            console.warn(`[WARN] 未找到 channelId=${channelId} 对应的群`);
-            await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
-            return;
-          }
-
-          // 使用 sendFile 发送到目标群，并添加新的 caption
-          for (const targetChatId of targetChatIds) {
-            try {
-              const sentMsg = await client.sendFile(targetChatId, {
-                file: message.media,
-                caption: `${channelOrderId}`
-              });
-              console.log(`Sent to ${chatId}:`, sentMsg.id);
-              // 保存上下文（单个订单用）
-              orderContextMap.set(sentMsg.id, {
-                orderId,
-                originalMsgId: message.id,
-                fromChat: chatId
-              });
-            } catch (error) {
-              console.error(`Failed to send to ${chatId}:`, error.message);
-            }
-          }
-
-          console.log(`[INFO] 渠道单号已发送至 目标群`);
-
-        } catch (err) {
-          console.error(`[ERROR] 请求接口失败:`, err.message);
-        }
-      }
-    }
-
-    // 渠道群回复监听 → 转发回商户群
-    if (
-      // meId === senderTelegramID  &&
-      message.replyTo &&
-      message.replyTo.replyToMsgId) {
-      // const channelGroupIds = await getChatIdsByAccountInChannel(AccountIdSet);
-      const channelGroupIds = await getAllChatIdsInChannel();
-      if(channelGroupIds.has(String(chatId)) ){
-        const replyToId = message.replyTo.replyToMsgId;
-        const context = orderContextMap.get(replyToId);
-
-        if (context) {
-          const replyContent = message.text || '';
-          const replyText = await getReplyText(replyContent);
-
-          if (replyText === null) {
-
-            await client.sendMessage(ErrorGroupChatID, {
-              message: `[WARN] 語料庫沒有記錄 ` + replyContent + `, Chat ID :${chatId}`  + `, Chat Name :${chatTitle}`,
-            });
-            console.log(`[WARN] 語料庫沒有記錄 ` + replyContent + `, Chat ID :${chatId}`  + `, Chat Name :${chatTitle}`);
-          }
-
-          await client.sendMessage(context.fromChat, {
-            message: replyText !== null ? replyText : replyContent,
-            replyTo: context.originalMsgId
-          });
-
-          console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
-
-          // 可选：清理上下文
-          orderContextMap.delete(replyToId);
-        } else {
-          console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
-        }
-      }
+    try {
+      await handleEvent(client, event);
+    } catch (e) {
+      console.error('[EventHandler Error]', e);
     }
   }, new NewMessage({}));
 }
 
+async function handleEvent(client, event) {
+  const chatId = event.chatId?.valueOf();
+  const chat = await client.getEntity(chatId);
+  const chatTitle = chat.title;
+  const message = event.message;
+  const me = await event._client.getMe();
+  const meId = String(me.id);
+  const sender = await event.message.senderId;
+  const senderTelegramID = String(sender);
+
+  // ----------- 1. 标记渠道群 -----------
+  if (
+    meId === senderTelegramID &&
+    typeof message.message === 'string' &&
+    message.message.startsWith('此群渠道群ID设为') &&
+    message.message.includes("监听")
+  ) {
+    await handleMarkChannelGroup(client, chatId, chatTitle, message.message);
+    return;
+  }
+
+  // ----------- 2. 标记商户群 -----------
+  if (
+    meId === senderTelegramID &&
+    typeof message.message === 'string' &&
+    message.message.startsWith('此群标记为商户群') &&
+    message.message.includes("监听")
+  ) {
+    await handleMarkMerchantGroup(client, chatId, chatTitle, message.message);
+    return;
+  }
+
+  // ----------- 3. 来源群监听，转发带订单图片 -----------
+  if (
+    message.media?.className === 'MessageMediaPhoto' &&
+    typeof message.message === 'string' &&
+    message.message.trim().length > 0
+  ) {
+    await handleMerchantOrderMessage(client, chatId, message, chatTitle);
+    return;
+  }
+
+  // ----------- 4. 渠道群回复监听，转发回商户群 -----------
+  if (message.replyTo && message.replyTo.replyToMsgId) {
+    await handleChannelReply(client, chatId, chatTitle, message);
+    return;
+  }
+}
+
+// =================== 标记渠道群 =====================
+async function handleMarkChannelGroup(client, chatId, chatTitle, text) {
+  const match = text.match(/此群渠道群ID设为(\d+)由(.+?)监听/);
+  if (!match) return;
+  const channelId = match[1];
+  const accountId = match[2];
+
+  // 检查唯一性
+  if (
+    await tgDbService.getGroupAccountChannelCount(channelId, accountId) !== 0 ||
+    await tgDbService.getGroupIdChannelCount(channelId) !== 0 ||
+    await tgDbService.getChannelChatIdCountExcludingAccount(chatId, accountId) !== 0
+  ) {
+    await client.sendMessage(chatId, { message: `渠道ID/ChatID 重复或已绑定` });
+    console.log(`渠道ID/ChatID 重复或已绑定`);
+    return;
+  }
+
+  await tgDbService.insertGroupChannel(accountId, String(channelId), chatId, chatTitle, "channel", 1);
+  await client.sendMessage(chatId, { message: `渠道群绑定成功：渠道Id = ${channelId}, 由 ${accountId} 机器人监听` });
+  console.log(`[INFO] 渠道群 ${chatId} 已标记为 channelId ${channelId}, 由 ${accountId} 机器人监听`);
+}
+
+// =================== 标记商户群 =====================
+async function handleMarkMerchantGroup(client, chatId, chatTitle, text) {
+  const match = text.match(/此群标记为商户群由(.+?)监听/);
+  if (!match) return;
+  const accountId = match[1];
+
+  // 检查 chatId 唯一性
+  if (await tgDbService.getMerchantChatIdCountExcludingAccount(chatId, accountId) !== 0) {
+    await client.sendMessage(chatId, { message: `請勿重覆綁定` });
+    console.log(`請勿重覆綁定`);
+    return;
+  }
+
+  await tgDbService.insertGroupMerchant(accountId, chatId, chatTitle, "merchant", 1);
+  await client.sendMessage(chatId, { message: ` 当前群 ${chatId} 已标记为商户群, 由 ${accountId} 机器人监听` });
+  console.log(`[INFO] 群 ${chatId} 被标记为商户群, 由 ${accountId} 机器人监听`);
+}
+
+// ========== 来源群订单消息处理 ============
+async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
+  // 判断是否来源有效商户群 & 账号
+  const relevantAccountIds = await tgDbService.getAccountIdsByChatIdInMerchant(chatId);
+  const me = await client.getMe();
+  const accountIdFromClient = await tgDbService.getAccountIdByTelegramId(String(me.id));
+  const sourceGroupIds = await tgDbService.getAllChatIdsInMerchant();
+
+  if (!sourceGroupIds.has(String(chatId)) || !relevantAccountIds.has(accountIdFromClient)) return;
+
+  const orderId = message.message.trim();
+  console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
+  try {
+    const response = await axios.get('https://bi.humideah.com/bi/payin/check', {
+      params: { order_id: orderId }
+    });
+    const channelId = response.data?.channel_id || '未获得到渠道ID';
+    const channelOrderId = response.data?.channel_order_id || '未获取到渠道单号';
+    const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
+
+    if (!targetChatIds.length) {
+      await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
+      return;
+    }
+    // 群发图片
+    for (const targetChatId of targetChatIds) {
+      try {
+        const sentMsg = await client.sendFile(targetChatId, {
+          file: message.media,
+          caption: `${channelOrderId}`
+        });
+        orderContextMap.set(sentMsg.id, {
+          orderId,
+          originalMsgId: message.id,
+          fromChat: chatId
+        });
+        console.log(`Sent to ${targetChatId}:`, sentMsg.id);
+      } catch (err) {
+        console.error(`Failed to send to ${targetChatId}:`, err.message);
+      }
+    }
+    console.log(`[INFO] 渠道单号已发送至目标群`);
+  } catch (err) {
+    console.error(`[ERROR] 请求接口失败:`, err.message);
+  }
+}
+
+// ========== 渠道群回复监听 → 回转商户群 ============
+async function handleChannelReply(client, chatId, chatTitle, message) {
+  const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
+  if (!channelGroupIds.has(String(chatId))) return;
+
+  const replyToId = message.replyTo.replyToMsgId;
+  const context = orderContextMap.get(replyToId);
+
+  if (context) {
+    const replyContent = message.text || '';
+    const replyText = await tgDbService.getReplyText(replyContent);
+
+    if (replyText === null) {
+      await client.sendMessage(ErrorGroupChatID, {
+        message: `[WARN] 語料庫沒有記錄 ${replyContent}, Chat ID :${chatId}, Chat Name :${chatTitle}`,
+      });
+      console.log(`[WARN] 語料庫沒有記錄 ${replyContent}, Chat ID :${chatId}, Chat Name :${chatTitle}`);
+    }
+    await client.sendMessage(context.fromChat, {
+      message: replyText !== null ? replyText : replyContent,
+      replyTo: context.originalMsgId
+    });
+    console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
+    orderContextMap.delete(replyToId);
+  } else {
+    console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
+  }
+}
+
+// =================== 动态启动/停止 ===============
 async function stopListener(id) {
   const clientEntry = clients.find(entry => entry.id === id);
   if (!clientEntry) {
     console.warn(`No client found with id: ${id}`);
     return;
   }
-
   try {
     await clientEntry.client.disconnect();
-    console.log(`Client manually disconnected: ${id}`);
     removeClientById(id);
+    console.log(`Client manually disconnected: ${id}`);
   } catch (err) {
     console.error(`Failed to disconnect client with id ${id}:`, err);
   }
 }
 
-
-async function startListener(Id) {
-
-  const data = await getAccountById(Id);
-
+async function startListener(id) {
+  const data = await tgDbService.getAccountById(id);
   const client = new TelegramClient(
     new StringSession(data.session),
     Number(data.api_id),
     data.api_hash,
     { connectionRetries: 5 }
   );
-
   await client.connect();
   console.log(`Client connected at runtime: ${data.api_id}`);
-
-  setupEventHandlers(client, data.api_id);
+  setupEventHandlers(client);
   clients.push({ id: data.Id, client });
 }
 
 function removeClientById(id) {
-  const index = clients.findIndex(entry => entry.id === id);
-  if (index !== -1) {
-    clients.splice(index, 1);
+  const idx = clients.findIndex(entry => entry.id === id);
+  if (idx !== -1) {
+    clients.splice(idx, 1);
     console.log(`Client with ID ${id} removed from the list`);
   } else {
     console.warn(`No client found with ID ${id}`);
   }
 }
 
+// =================== 模块导出 ====================
 module.exports = {
   startListener,
   stopListener
