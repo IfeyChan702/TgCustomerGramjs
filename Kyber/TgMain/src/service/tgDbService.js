@@ -76,6 +76,39 @@ const getChatIdsByAccountInMerchant = async (registerIdSet) => {
   return new Set(results.map(row => row.chat_id));
 };
 
+
+/**
+ * 查找 tg_groups_merchant 表中 chat_id Set
+ * @returns {Promise<Set<any>>}
+ */
+const getAllChatIdsInMerchant = async () => {
+  const sql = `SELECT chat_id FROM tg_groups_merchant`;
+  const results = await queryAsync(sql);
+  return new Set(results.map(row => row.chat_id));
+};
+
+/**
+ * 查找 tg_groups_merchant 表中 的 tg_account_id
+ * @returns {Promise<Set<any>>}
+ */
+const getAllAccountIdsInMerchant = async () => {
+  const sql = `SELECT tg_account_id FROM tg_groups_merchant`;
+  const results = await queryAsync(sql);
+  return new Set(results.map(row => row.tg_account_id));
+};
+
+/**
+ * 從Chat_id 查找 tg_groups_merchant 表中 的 tg_account_id
+ * @param chatId
+ * @returns {Promise<Set<any>>}
+ */
+const getAccountIdsByChatIdInMerchant = async (chatId) => {
+  const sql = `SELECT tg_account_id FROM tg_groups_merchant WHERE chat_id = ?`;
+  const results = await queryAsync(sql, [chatId]);
+  return new Set(results.map(row => row.tg_account_id));
+};
+
+
 /**
  * 根据 accountId Set 查找 tg_groups_channel 表中 chat_id Set
  */
@@ -86,6 +119,18 @@ const getChatIdsByAccountInChannel = async (registerIdSet) => {
   const results = await queryAsync(sql, ids);
   return new Set(results.map(row => row.chat_id));
 };
+
+/**
+ * 查找 tg_groups_channel 表中 chat_id Set
+ * @returns {Promise<Set<any>>}
+ */
+const getAllChatIdsInChannel = async () => {
+  const sql = `SELECT chat_id FROM tg_groups_channel`;
+  const results = await queryAsync(sql);
+  return new Set(results.map(row => row.chat_id));
+};
+
+
 
 /**
  * 查找 channelId 在 tg_groups_channel 表中的所有 chat_id（按创建时间倒序）
@@ -157,7 +202,7 @@ const getAccountById = async (id) => {
  * @param accountId
  * @returns {Promise<number|number>}
  */
-const getGroupChannelCount = async (groupId, accountId) => {
+const getGroupAccountChannelCount = async (groupId, accountId) => {
   const sql = `
     SELECT COUNT(*) AS count
     FROM tg_groups_channel
@@ -166,6 +211,23 @@ const getGroupChannelCount = async (groupId, accountId) => {
   const results = await queryAsync(sql, [groupId, accountId]);
   return results.length > 0 ? parseInt(results[0].count, 10) : 0;
 };
+
+
+/**
+ * 拿包含Group_id的總數
+ * @param groupId
+ * @returns {Promise<number|number>}
+ */
+const getGroupIdChannelCount = async (groupId) => {
+  const sql = `
+    SELECT COUNT(*) AS count
+    FROM tg_groups_channel
+    WHERE group_id = ?
+  `;
+  const results = await queryAsync(sql, [groupId]);
+  return results.length > 0 ? parseInt(results[0].count, 10) : 0;
+};
+
 
 
 /**
@@ -200,12 +262,30 @@ const getMerchantChatIdCountExcludingAccount = async (chatId, excludedAccountId)
   return results.length > 0 ? parseInt(results[0].count, 10) : 0;
 };
 
+/**
+ * 從TelegramID找AccountID
+ * @param telegramId
+ * @returns {Promise<*|null>}
+ */
+const getAccountIdByTelegramId = async (telegramId) => {
+  const sql = `SELECT id FROM tg_accounts WHERE telegram_id = ?`;
+  const results = await queryAsync(sql, [telegramId]);
+  return results.length > 0 ? results[0].id : null;
+};
+
+
 
 // 统一导出
 module.exports = {
+  getAccountIdsByChatIdInMerchant,
+  getAccountIdByTelegramId,
+  getAllAccountIdsInMerchant,
+  getAllChatIdsInChannel,
+  getAllChatIdsInMerchant,
   getMerchantChatIdCountExcludingAccount,
   getChannelChatIdCountExcludingAccount,
-  getGroupChannelCount,
+  getGroupAccountChannelCount,
+  getGroupIdChannelCount,
   getTopRegisterId,
   getAccountByRegisterIdArray,
   insertGroupChannel,
