@@ -149,8 +149,63 @@ const getAccountById = async (id) => {
   return results.length > 0 ? results[0] : null;
 };
 
+
+/**
+ * 拿包含Group_id和Chat_id的總數
+ * @param groupId
+ * @param chatId
+ * @param accountId
+ * @returns {Promise<number|number>}
+ */
+const getGroupChannelCount = async (groupId, accountId) => {
+  const sql = `
+    SELECT COUNT(*) AS count
+    FROM tg_groups_channel
+    WHERE group_id = ? AND tg_account_id = ?
+  `;
+  const results = await queryAsync(sql, [groupId, accountId]);
+  return results.length > 0 ? parseInt(results[0].count, 10) : 0;
+};
+
+
+/**
+ * 查找有沒有用過Chat ID
+ * @param chatId
+ * @param excludedAccountId
+ * @returns {Promise<number|number>}
+ */
+const getChannelChatIdCountExcludingAccount = async (chatId, excludedAccountId) => {
+  const sql = `
+    SELECT COUNT(*) AS count
+    FROM tg_groups_channel
+    WHERE chat_id = ? AND tg_account_id != ?
+  `;
+  const results = await queryAsync(sql, [chatId, excludedAccountId]);
+  return results.length > 0 ? parseInt(results[0].count, 10) : 0;
+};
+
+/**
+ * 查找有沒有用過Chat ID
+ * @param chatId
+ * @param excludedAccountId
+ * @returns {Promise<number|number>}
+ */
+const getMerchantChatIdCountExcludingAccount = async (chatId, excludedAccountId) => {
+  const sql = `
+    SELECT COUNT(*) AS count
+    FROM tg_groups_merchant
+    WHERE chat_id = ? AND tg_account_id != ?
+  `;
+  const results = await queryAsync(sql, [chatId, excludedAccountId]);
+  return results.length > 0 ? parseInt(results[0].count, 10) : 0;
+};
+
+
 // 统一导出
 module.exports = {
+  getMerchantChatIdCountExcludingAccount,
+  getChannelChatIdCountExcludingAccount,
+  getGroupChannelCount,
   getTopRegisterId,
   getAccountByRegisterIdArray,
   insertGroupChannel,

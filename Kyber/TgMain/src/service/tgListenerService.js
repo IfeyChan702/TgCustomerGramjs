@@ -4,7 +4,7 @@ const { NewMessage } = require('telegram/events');
 const { Api } = require('telegram');
 const { startRedis, redis } = require("../models/redisModel");
 const axios = require('axios');
-const {getAccountById,getReplyText,getLatestRegisterIds , getAccountByRegisterIdArray ,insertGroupChannel, getChatIdsByAccountInChannel, getChatIdsByAccountInMerchant, insertGroupMerchant, getChatIdsByChannelIdInChannel} = require("./tgDbService");
+const {getMerchantChatIdCountExcludingAccount,getChannelChatIdCountExcludingAccount,getGroupChannelCount,getAccountById,getReplyText,getLatestRegisterIds , getAccountByRegisterIdArray ,insertGroupChannel, getChatIdsByAccountInChannel, getChatIdsByAccountInMerchant, insertGroupMerchant, getChatIdsByChannelIdInChannel} = require("./tgDbService");
 
 const orderContextMap = new Map();
 let AccountId;
@@ -83,6 +83,23 @@ function setupEventHandlers(client) {
       if (match) {
         const channelId = match[1];
         AccountId = match[2];
+
+        const count_group_id = await getGroupChannelCount(channelId, AccountId);
+        if (count_group_id!==0){
+          await client.sendMessage(chatId, {
+            message: `渠道ID 重覆了`,
+          });
+          return;
+        }
+//需要修改
+        const count_chat_id = await getChannelChatIdCountExcludingAccount(chatId, AccountId);
+        if (count_chat_id!==0){
+          await client.sendMessage(chatId, {
+            message: `請勿重覆綁定`,
+          });
+          return;
+        }
+
         AccountIdSet.add(AccountId);
         await insertGroupChannel(AccountId, String(channelId), chatId, chatTitle, "channel", 1);
         await client.sendMessage(chatId, {
@@ -100,9 +117,18 @@ function setupEventHandlers(client) {
       message.message.startsWith('此群标记为商户群') &&
       message.message.includes("监听")
     ) {
-      const match = message.message.match(/由(.+?)监听/);
+      const match = message.message.match(/此群标记为商户群由(.+?)监听/);
       if (match) {
         AccountId = match[1];
+//需要修改
+        const count_chat_id = await getMerchantChatIdCountExcludingAccount(chatId, AccountId);
+        if (count_chat_id!==0){
+          await client.sendMessage(chatId, {
+            message: `請勿重覆綁定`,
+          });
+          return;
+        }
+
         AccountIdSet.add(AccountId);
         await insertGroupMerchant(AccountId, chatId, chatTitle, "merchant", 1);
         await client.sendMessage(chatId, {
@@ -146,7 +172,7 @@ function setupEventHandlers(client) {
             try {
               const sentMsg = await client.sendFile(targetChatId, {
                 file: message.media,
-                caption: `channelOrderId：${channelOrderId}`
+                caption: `${channelOrderId}`
               });
               console.log(`Sent to ${chatId}:`, sentMsg.id);
               // 保存上下文（单个订单用）
