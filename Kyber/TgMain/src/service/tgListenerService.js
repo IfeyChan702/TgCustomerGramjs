@@ -4,7 +4,7 @@ const { NewMessage } = require('telegram/events');
 const { Api } = require('telegram');
 const { startRedis, redis } = require("../models/redisModel");
 const axios = require('axios');
-const {getMerchantChatIdCountExcludingAccount,getChannelChatIdCountExcludingAccount,getGroupChannelCount,getAccountById,getReplyText,getLatestRegisterIds , getAccountByRegisterIdArray ,insertGroupChannel, getChatIdsByAccountInChannel, getChatIdsByAccountInMerchant, insertGroupMerchant, getChatIdsByChannelIdInChannel} = require("./tgDbService");
+const {getAccountIdsByChatIdInMerchant,getAccountIdByTelegramId,getAllAccountIdsInMerchant,getAllChatIdsInChannel,getAllChatIdsInMerchant,getMerchantChatIdCountExcludingAccount,getChannelChatIdCountExcludingAccount,getGroupAccountChannelCount,getGroupIdChannelCount,getAccountById,getReplyText,getLatestRegisterIds , getAccountByRegisterIdArray ,insertGroupChannel, getChatIdsByAccountInChannel, getChatIdsByAccountInMerchant, insertGroupMerchant, getChatIdsByChannelIdInChannel} = require("./tgDbService");
 
 const orderContextMap = new Map();
 let AccountId;
@@ -84,11 +84,23 @@ function setupEventHandlers(client) {
         const channelId = match[1];
         AccountId = match[2];
 
-        const count_group_id = await getGroupChannelCount(channelId, AccountId);
+        const count_group_id = await getGroupAccountChannelCount(channelId, AccountId);
         if (count_group_id!==0){
           await client.sendMessage(chatId, {
             message: `渠道ID 重覆了`,
           });
+          // 需要修改
+          console.log(`渠道ID 重覆了`);
+          return;
+        }
+
+        const count_group_id_2 = await getGroupIdChannelCount(channelId);
+        if (count_group_id_2!==0){
+          await client.sendMessage(chatId, {
+            message: `渠道ID 重覆了`,
+          });
+          // 需要修改
+          console.log(`渠道ID 重覆了`);
           return;
         }
 //需要修改
@@ -97,6 +109,8 @@ function setupEventHandlers(client) {
           await client.sendMessage(chatId, {
             message: `請勿重覆綁定`,
           });
+          // 需要修改
+          console.log(`請勿重覆綁定`);
           return;
         }
 
@@ -126,6 +140,8 @@ function setupEventHandlers(client) {
           await client.sendMessage(chatId, {
             message: `請勿重覆綁定`,
           });
+          // 需要修改
+          console.log(`請勿重覆綁定`);
           return;
         }
 
@@ -146,8 +162,11 @@ function setupEventHandlers(client) {
       typeof message.message === 'string' && // 图片附带的文字
       message.message.trim().length > 0
     ) {
-      const sourceGroupIds = await getChatIdsByAccountInMerchant(AccountIdSet);
-      if(sourceGroupIds.has(String(chatId))){
+      const relevantAccountIds = await getAccountIdsByChatIdInMerchant(chatId);
+      const AccountIdfromClientID = await getAccountIdByTelegramId(meId);
+      // const sourceGroupIds = await getChatIdsByAccountInMerchant(AccountIdSet);
+      const sourceGroupIds = await getAllChatIdsInMerchant();
+      if(sourceGroupIds.has(String(chatId)) && relevantAccountIds.has(AccountIdfromClientID)){
 
         const orderId = message.message.trim();
         console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
@@ -199,7 +218,8 @@ function setupEventHandlers(client) {
       // meId === senderTelegramID  &&
       message.replyTo &&
       message.replyTo.replyToMsgId) {
-      const channelGroupIds = await getChatIdsByAccountInChannel(AccountIdSet);
+      // const channelGroupIds = await getChatIdsByAccountInChannel(AccountIdSet);
+      const channelGroupIds = await getAllChatIdsInChannel();
       if(channelGroupIds.has(String(chatId)) ){
         const replyToId = message.replyTo.replyToMsgId;
         const context = orderContextMap.get(replyToId);
@@ -211,8 +231,9 @@ function setupEventHandlers(client) {
           if (replyText === null) {
 
             await client.sendMessage(ErrorGroupChatID, {
-              message: `[WARN] 語料庫沒有記錄 ` + replyContent,
+              message: `[WARN] 語料庫沒有記錄 ` + replyContent + `, Chat ID :${chatId}`  + `, Chat Name :${chatTitle}`,
             });
+            console.log(`[WARN] 語料庫沒有記錄 ` + replyContent + `, Chat ID :${chatId}`  + `, Chat Name :${chatTitle}`);
           }
 
           await client.sendMessage(context.fromChat, {
