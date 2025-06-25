@@ -7,8 +7,8 @@ exports.getAllMerchants = (keyword = '') => {
     const values = [];
 
     if (keyword) {
-      sql += ' WHERE group_name LIKE ? OR tg_account_id LIKE ?';
-      values.push(`%${keyword}%`);
+      sql += ' WHERE group_name LIKE ? OR chat_id LIKE ? OR tg_account_id LIKE ?';
+      values.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
     }
 
     db.query(sql, values, (err, results) => {

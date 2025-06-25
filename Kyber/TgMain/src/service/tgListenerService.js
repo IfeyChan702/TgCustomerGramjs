@@ -5,6 +5,7 @@ const { Api } = require('telegram');
 const { startRedis, redis } = require("../models/redisModel");
 const axios = require('axios');
 const tgDbService = require("./tgDbService");
+const { getOrderByChannelMsgId } = require("./tgDbService");
 
 const orderContextMap = new Map();
 const clients = [];
@@ -173,11 +174,27 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
           file: message.media,
           caption: `${channelOrderId}`
         });
-        orderContextMap.set(sentMsg.id, {
-          orderId,
+        //TODO: 这边添加表数据
+        //sentMsgId, merchantMsgId, merchantId, channelId, tgReplyId, merchantOrderId, channelOrderId
+        try {
+          const exist = await tgDbService.getOrderByMeChMoCo(chatId,channelId,orderId,channelOrderId)
+          if (!exist){
+            await tgDbService.insertOrderContext(sentMsg.id,message.id,chatId,channelId,orderId,channelOrderId);
+            console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${orderId}`);
+          }else {
+            await tgDbService.updateMsgIdsByOrderKey(sentMsg.id,message.id,chatId,channelId,orderId,channelOrderId);
+            console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${orderId}`);
+          }
+        }catch (err){
+          console.error('❌ 插入 tg_order 失敗:', err.message);
+          return;
+        }
+
+        /*orderContextMap.set(sentMsg.id, {
+          orderId,//是什么id，这个是商户id？
           originalMsgId: message.id,
-          fromChat: chatId
-        });
+          fromChat: chatId//这个什么的id
+        });*/
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
         console.error(`Failed to send to ${targetChatId}:`, err.message);
@@ -195,24 +212,31 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
   if (!channelGroupIds.has(String(chatId))) return;
 
   const replyToId = message.replyTo.replyToMsgId;
-  const context = orderContextMap.get(replyToId);
+  //TODO:从数据库里面根据sentMsg.id拿到数据
+  const context = await tgDbService.getOrderByChannelMsgId(replyToId);
+  //const context = orderContextMap.get(replyToId);
 
-  if (context) {
+  if (context && context.merchant_msg_id && context.merchant_id) {
     const replyContent = message.text || '';
     const replyText = await tgDbService.getReplyText(replyContent);
+    let replyId = null;
 
     if (replyText === null) {
       await client.sendMessage(ErrorGroupChatID, {
         message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`,
       });
       console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
+    }else {
+      replyId = replyText.id
+      await client.sendMessage(context.merchant_id, {
+        message: replyText.reply_text,
+        replyTo: context.merchant_msg_id
+      });
+      console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
     }
-    await client.sendMessage(context.fromChat, {
-      message: replyText !== null ? replyText : replyContent,
-      replyTo: context.originalMsgId
-    });
-    console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
-    // orderContextMap.delete(replyToId);
+    //TODO：这边可以改为修改订单的状态
+    //orderContextMap.delete(replyToId);
+    await tgDbService.updateOrderStatusByChannelMsgId(replyToId,replyId);
   } else {
     console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
   }
