@@ -155,7 +155,7 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
   const orderId = message.message.trim();
   console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
   try {
-    const response = await axios.get('https://bi.humideah.com/bi/payin/check', {
+    const response = await axios.get('https://bi.sompay.xyz/bi/payin/check', {
       params: { order_id: orderId }
     });
     const channelId = response.data?.channel_id || '未获得到渠道ID';
