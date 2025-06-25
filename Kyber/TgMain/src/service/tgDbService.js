@@ -25,7 +25,9 @@ const getTopRegisterId = async () => {
  */
 const getAccountByRegisterIdArray = async (registerIds) => {
   if (!Array.isArray(registerIds) || !registerIds.length) throw new Error("registerIds must be a non-empty array");
-  const results = await queryAsync(`SELECT * FROM tg_accounts WHERE registerId IN (?)`, [registerIds]);
+  const results = await queryAsync(`SELECT *
+                                    FROM tg_accounts
+                                    WHERE registerId IN (?)`, [registerIds]);
   return results;
 };
 
@@ -34,11 +36,14 @@ const getAccountByRegisterIdArray = async (registerIds) => {
  */
 const insertGroupChannel = async (tg_account_id, group_id, chat_id, group_name, role, template_id) => {
   const sql = `
-    INSERT INTO tg_groups_channel 
-    (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON DUPLICATE KEY UPDATE group_id=VALUES(group_id), group_name=VALUES(group_name), 
-    role=VALUES(role), template_id=VALUES(template_id), created_at=CURRENT_TIMESTAMP
+      INSERT INTO tg_groups_channel
+      (tg_account_id, group_id, chat_id, group_name, role, template_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY
+      UPDATE group_id=
+      VALUES (group_id), group_name=
+      VALUES (group_name), role =
+      VALUES (role), template_id=
+      VALUES (template_id), created_at= CURRENT_TIMESTAMP
   `;
   const values = [tg_account_id, group_id, chat_id, group_name, role, template_id];
   const result = await queryAsync(sql, values);
@@ -52,15 +57,15 @@ const insertGroupChannel = async (tg_account_id, group_id, chat_id, group_name, 
 const insertGroupMerchant = async (tg_account_id, chat_id, group_name, role, template_id) => {
   try {
     const sql = `
-      INSERT INTO tg_groups_merchant
-      (tg_account_id, chat_id, group_name, role, template_id, created_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO tg_groups_merchant
+            (tg_account_id, chat_id, group_name, role, template_id, created_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `;
     const values = [tg_account_id, chat_id, group_name, role, template_id];
     const result = await queryAsync(sql, values);
     return result.insertId;
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') return 0;
+    if (err.code === "ER_DUP_ENTRY") return 0;
     throw err;
   }
 };
@@ -71,7 +76,9 @@ const insertGroupMerchant = async (tg_account_id, chat_id, group_name, role, tem
 const getChatIdsByAccountInMerchant = async (registerIdSet) => {
   if (!registerIdSet || !registerIdSet.size) return new Set();
   const ids = Array.from(registerIdSet);
-  const sql = `SELECT chat_id FROM tg_groups_merchant WHERE tg_account_id IN (${ids.map(() => '?').join(',')})`;
+  const sql = `SELECT chat_id
+               FROM tg_groups_merchant
+               WHERE tg_account_id IN (${ids.map(() => "?").join(",")})`;
   const results = await queryAsync(sql, ids);
   return new Set(results.map(row => row.chat_id));
 };
@@ -82,7 +89,8 @@ const getChatIdsByAccountInMerchant = async (registerIdSet) => {
  * @returns {Promise<Set<any>>}
  */
 const getAllChatIdsInMerchant = async () => {
-  const sql = `SELECT chat_id FROM tg_groups_merchant`;
+  const sql = `SELECT chat_id
+               FROM tg_groups_merchant`;
   const results = await queryAsync(sql);
   return new Set(results.map(row => row.chat_id));
 };
@@ -92,7 +100,8 @@ const getAllChatIdsInMerchant = async () => {
  * @returns {Promise<Set<any>>}
  */
 const getAllAccountIdsInMerchant = async () => {
-  const sql = `SELECT tg_account_id FROM tg_groups_merchant`;
+  const sql = `SELECT tg_account_id
+               FROM tg_groups_merchant`;
   const results = await queryAsync(sql);
   return new Set(results.map(row => row.tg_account_id));
 };
@@ -103,7 +112,9 @@ const getAllAccountIdsInMerchant = async () => {
  * @returns {Promise<Set<any>>}
  */
 const getAccountIdsByChatIdInMerchant = async (chatId) => {
-  const sql = `SELECT tg_account_id FROM tg_groups_merchant WHERE chat_id = ?`;
+  const sql = `SELECT tg_account_id
+               FROM tg_groups_merchant
+               WHERE chat_id = ?`;
   const results = await queryAsync(sql, [chatId]);
   return new Set(results.map(row => row.tg_account_id));
 };
@@ -115,7 +126,9 @@ const getAccountIdsByChatIdInMerchant = async (chatId) => {
 const getChatIdsByAccountInChannel = async (registerIdSet) => {
   if (!registerIdSet || !registerIdSet.size) return new Set();
   const ids = Array.from(registerIdSet);
-  const sql = `SELECT chat_id FROM tg_groups_channel WHERE tg_account_id IN (${ids.map(() => '?').join(',')})`;
+  const sql = `SELECT chat_id
+               FROM tg_groups_channel
+               WHERE tg_account_id IN (${ids.map(() => "?").join(",")})`;
   const results = await queryAsync(sql, ids);
   return new Set(results.map(row => row.chat_id));
 };
@@ -125,11 +138,11 @@ const getChatIdsByAccountInChannel = async (registerIdSet) => {
  * @returns {Promise<Set<any>>}
  */
 const getAllChatIdsInChannel = async () => {
-  const sql = `SELECT chat_id FROM tg_groups_channel`;
+  const sql = `SELECT chat_id
+               FROM tg_groups_channel`;
   const results = await queryAsync(sql);
   return new Set(results.map(row => row.chat_id));
 };
-
 
 
 /**
@@ -146,14 +159,12 @@ const getChatIdsByChannelIdInChannel = async (channelId) => {
  */
 const getLatestRegisterIds = async () => {
   const sql = `
-    SELECT t1.registerId
-    FROM tg_accounts t1
-    JOIN (
-      SELECT phone, MAX(created_at) AS latest_created_at
-      FROM tg_accounts
-      WHERE is_running = 1
-      GROUP BY phone
-    ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
+      SELECT t1.registerId
+      FROM tg_accounts t1
+               JOIN (SELECT phone, MAX(created_at) AS latest_created_at
+                     FROM tg_accounts
+                     WHERE is_running = 1
+                     GROUP BY phone) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
   `;
   const results = await queryAsync(sql);
   return results.map(row => row.registerId);
@@ -164,14 +175,12 @@ const getLatestRegisterIds = async () => {
  */
 const getLatestAccountIds = async () => {
   const sql = `
-    SELECT t1.id
-    FROM tg_accounts t1
-    JOIN (
-      SELECT phone, MAX(created_at) AS latest_created_at
-      FROM tg_accounts
-      WHERE is_running = 1
-      GROUP BY phone
-    ) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
+      SELECT t1.id
+      FROM tg_accounts t1
+               JOIN (SELECT phone, MAX(created_at) AS latest_created_at
+                     FROM tg_accounts
+                     WHERE is_running = 1
+                     GROUP BY phone) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
   `;
   return await queryAsync(sql);
 };
@@ -180,16 +189,20 @@ const getLatestAccountIds = async () => {
  * 查找回复文本（根据匹配规则）
  */
 const getReplyText = async (matchRule) => {
-  const sql = `SELECT reply_text FROM tg_reply WHERE match_rule = ? LIMIT 1`;
+  const sql = `SELECT id,reply_text
+               FROM tg_reply
+               WHERE match_rule = ? LIMIT 1`;
   const results = await queryAsync(sql, [matchRule]);
-  return results.length > 0 ? results[0].reply_text : null;
+  return results.length > 0 ? results[0] : null;
 };
 
 /**
  * 根据 id 查找账户信息
  */
 const getAccountById = async (id) => {
-  const sql = `SELECT * FROM tg_accounts WHERE id = ?`;
+  const sql = `SELECT *
+               FROM tg_accounts
+               WHERE id = ?`;
   const results = await queryAsync(sql, [id]);
   return results.length > 0 ? results[0] : null;
 };
@@ -204,9 +217,9 @@ const getAccountById = async (id) => {
  */
 const getGroupAccountChannelCount = async (groupId, accountId) => {
   const sql = `
-    SELECT COUNT(*) AS count
-    FROM tg_groups_channel
-    WHERE group_id = ? AND tg_account_id = ?
+      SELECT COUNT(*) AS count
+      FROM tg_groups_channel
+      WHERE group_id = ? AND tg_account_id = ?
   `;
   const results = await queryAsync(sql, [groupId, accountId]);
   return results.length > 0 ? parseInt(results[0].count, 10) : 0;
@@ -220,14 +233,13 @@ const getGroupAccountChannelCount = async (groupId, accountId) => {
  */
 const getGroupIdChannelCount = async (groupId) => {
   const sql = `
-    SELECT COUNT(*) AS count
-    FROM tg_groups_channel
-    WHERE group_id = ?
+      SELECT COUNT(*) AS count
+      FROM tg_groups_channel
+      WHERE group_id = ?
   `;
   const results = await queryAsync(sql, [groupId]);
   return results.length > 0 ? parseInt(results[0].count, 10) : 0;
 };
-
 
 
 /**
@@ -238,9 +250,9 @@ const getGroupIdChannelCount = async (groupId) => {
  */
 const getChannelChatIdCountExcludingAccount = async (chatId, excludedAccountId) => {
   const sql = `
-    SELECT COUNT(*) AS count
-    FROM tg_groups_channel
-    WHERE chat_id = ? AND tg_account_id != ?
+      SELECT COUNT(*) AS count
+      FROM tg_groups_channel
+      WHERE chat_id = ? AND tg_account_id != ?
   `;
   const results = await queryAsync(sql, [chatId, excludedAccountId]);
   return results.length > 0 ? parseInt(results[0].count, 10) : 0;
@@ -254,9 +266,9 @@ const getChannelChatIdCountExcludingAccount = async (chatId, excludedAccountId) 
  */
 const getMerchantChatIdCountExcludingAccount = async (chatId, excludedAccountId) => {
   const sql = `
-    SELECT COUNT(*) AS count
-    FROM tg_groups_merchant
-    WHERE chat_id = ? AND tg_account_id != ?
+      SELECT COUNT(*) AS count
+      FROM tg_groups_merchant
+      WHERE chat_id = ? AND tg_account_id != ?
   `;
   const results = await queryAsync(sql, [chatId, excludedAccountId]);
   return results.length > 0 ? parseInt(results[0].count, 10) : 0;
@@ -268,12 +280,128 @@ const getMerchantChatIdCountExcludingAccount = async (chatId, excludedAccountId)
  * @returns {Promise<*|null>}
  */
 const getAccountIdByTelegramId = async (telegramId) => {
-  const sql = `SELECT id FROM tg_accounts WHERE telegram_id = ?`;
+  const sql = `SELECT id
+               FROM tg_accounts
+               WHERE telegram_id = ?`;
   const results = await queryAsync(sql, [telegramId]);
   return results.length > 0 ? results[0].id : null;
 };
 
+/**
+ * 添加order数据
+ */
+const insertOrderContext = async (channelMsgId, merchantMsgId, merchantId, channelId, merchantOrderId, channelOrderId) => {
+  const sql = `
+      INSERT INTO tg_order (channel_msg_id,
+                            merchant_msg_id,
+                            merchant_id,
+                            channel_id,
+                            status,
+                            created_time,
+                            merchant_order_id,
+                            channel_order_id)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+  `;
 
+  const values = [
+    channelMsgId,
+    merchantMsgId,
+    merchantId,
+    channelId,
+    0, // status 設為 0
+    merchantOrderId,
+    channelOrderId
+  ];
+
+  const result = await queryAsync(sql, values);
+  return result.insertId;
+};
+/**
+ * 根据channelMsgId查询tg_order表的订单
+ */
+const getOrderByChannelMsgId = async (channelMsgId) => {
+  const sql = `SELECT t.*
+               FROM tg_order t
+               WHERE channel_msg_id = ?`;
+  const results = await queryAsync(sql, [channelMsgId]);
+  return results.length > 0 ? results[0] : null;
+};
+/**
+ * 根据channelMsgId修改条件的状态和replyId（replyId有可能为空）
+ * @param originalMsgId
+ * @param newStatus
+ * @returns {Promise<*>}
+ */
+const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
+  let sql = `
+      UPDATE tg_order
+      SET status = 1
+  `;
+  const values = [];
+
+  // 仅当 replyId 不为 null/undefined 时更新 reply_id 字段
+  if (replyId !== null && replyId !== undefined) {
+    sql += `, tg_reply_id = ?`;
+    values.push(replyId);
+  }
+
+  sql += ` WHERE channel_msg_id = ?`;
+  values.push(channelMsgId);
+
+  try {
+    const result = await queryAsync(sql, values);
+    console.log(`[INFO] 已将 channel_msg_id=${channelMsgId} 的订单更新为 status=1${replyId != null ? `, reply_id=${replyId}` : ''}，影响笔数: ${result.affectedRows}`);
+    return result.affectedRows;
+  } catch (err) {
+    console.error(`[ERROR] 更新订单状态失败: ${err.message}`);
+    throw err;
+  }
+};
+
+/**
+ * 根据 merchantId, channelId, merchantOrderId, channelOrderId
+ */
+const getOrderByMeChMoCo = async (merchantId, channelId, merchantOrderId, channelOrderId) => {
+  const sql = `SELECT COUNT(*) AS count
+               FROM tg_order
+               WHERE merchant_id = ?
+                 AND channel_id = ?
+                 AND merchant_order_id = ?
+                 AND channel_order_id = ? `;
+  const values = [
+    merchantId,
+    channelId,
+    merchantOrderId,
+    channelOrderId
+  ];
+  const results = await queryAsync(sql, values);
+  return results[0].count > 0;
+};
+/**
+ * 根据merchantId,channelId,merchantOrderId,channelOrderId这四个字段，修改channel_msg_id，merchant_msg_id这两个字段
+ */
+const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantId, channelId, merchantOrderId, channelOrderId) => {
+  const sql = `
+      UPDATE tg_order
+      SET channel_msg_id  = ?,
+          merchant_msg_id = ?
+      WHERE merchant_id = ?
+        AND channel_id = ?
+        AND merchant_order_id = ?
+        AND channel_order_id = ?
+  `;
+  const values = [
+    newChannelMsgId,
+    newMerchantMsgId,
+    merchantId,
+    channelId,
+    merchantOrderId,
+    channelOrderId
+  ];
+
+  const result = await queryAsync(sql, values);
+  return result.affectedRows;
+};
 
 // 统一导出
 module.exports = {
@@ -290,6 +418,7 @@ module.exports = {
   getAccountByRegisterIdArray,
   insertGroupChannel,
   insertGroupMerchant,
+  insertOrderContext,
   getChatIdsByAccountInMerchant,
   getChatIdsByAccountInChannel,
   getChatIdsByChannelIdInChannel,
@@ -297,4 +426,8 @@ module.exports = {
   getLatestAccountIds,
   getReplyText,
   getAccountById,
+  getOrderByChannelMsgId,
+  updateOrderStatusByChannelMsgId,
+  getOrderByMeChMoCo,
+  updateMsgIdsByOrderKey
 };
