@@ -212,7 +212,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
       replyTo: context.originalMsgId
     });
     console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
-    orderContextMap.delete(replyToId);
+    // orderContextMap.delete(replyToId);
   } else {
     console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
   }
