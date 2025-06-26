@@ -9,3 +9,5 @@ router.get('/open/test', async (req, res) => {
     res.json(fail(err.message));
   }
 });
+
+module.exports = router;
