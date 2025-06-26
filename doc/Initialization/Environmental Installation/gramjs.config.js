@@ -8,8 +8,8 @@ autorestart: true,
 watch: false,
 max_memory_restart: "1G",
 env: {
-NODE_ENV: "development",
-// 其他GramJS需要的环境变量
+NODE_ENV: "production",
+// 其他GramJS需要的环境变量 production development
 }
 }]
 }
