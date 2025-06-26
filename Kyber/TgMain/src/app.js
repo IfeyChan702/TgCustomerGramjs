@@ -1,6 +1,7 @@
 const express = require('express');
 const { startRedis } = require('./models/redisModel');
 const loginRoutes = require('./routes/loginRoutes');
+const exportRoutes = require('./routes/ExportRoutes');
 const tgRoutes = require('./routes/tgRoutes');
 const replyRoutes = require('./routes/tgReplyRoutes');
 const merchantRoutes = require('./routes/tgMerchantRoute');
@@ -17,6 +18,7 @@ startRedis();
 
 // 注册路由
 app.use('/api', loginRoutes);
+app.use('/api', exportRoutes);
 app.use('/api/tg', tgRoutes);
 app.use('/api', replyRoutes);
 app.use('/api', merchantRoutes);

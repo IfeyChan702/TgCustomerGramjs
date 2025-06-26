@@ -1,5 +1,6 @@
 git clone https://github.com/IfeyChan702/TgCustomerGramjs.git
-
+## 项目放在这个文件下面
+/opt/ifey/tg-node-service
 pm2 start app.js --name "your-app-name"
 
 #!/bin/bash
@@ -28,6 +29,12 @@ NODE_ENV: "development",
 }
 }]
 }
+
+pm2 start /opt/ifey/tg-node-service/gramjs.config.js
+
+完整设置开机自启流程
+pm2 save
+pm2 startup
 
 
 pm2 logs gramjs-bot
