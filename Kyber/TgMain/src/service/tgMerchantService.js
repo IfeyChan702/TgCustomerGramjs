@@ -73,3 +73,14 @@ exports.deleteMerchant = (id) => {
     });
   });
 };
+
+//查询全部的商户id和商户名称
+exports.getAllMerchantForSelect = () => {
+  return new Promise((resolve,reject) => {
+    const sql = 'SELECT id,chat_id,group_name FROM tg_groups_merchant'
+    db.query(sql,[],(err,results) => {
+      if (err) return reject(err);
+      resolve(results);
+    })
+  })
+}

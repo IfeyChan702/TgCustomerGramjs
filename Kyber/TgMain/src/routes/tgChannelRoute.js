@@ -44,4 +44,14 @@ router.delete('/tg-channel/:id', async (req, res) => {
   }
 });
 
+//查询渠道（id，渠道名称）
+router.get('/tg-channel/list',async (req,res) => {
+  try {
+    const result = await tgChannelService.getAllChannelForSelect();
+    res.json(success(result));
+  }catch (err){
+    res.json(fail(err.message));
+  }
+})
+
 module.exports = router;
