@@ -146,6 +146,10 @@ async function handleMarkMerchantGroup(client, chatId, chatTitle, text) {
 
 // ========== 来源群订单消息处理 ============
 async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
+  await client.sendMessage(chatId, {
+    message: "客户请等待，现在为你查询订单",
+    replyTo: message.id
+  });
   // 判断是否来源有效商户群 & 账号
   const relevantAccountIds = await tgDbService.getAccountIdsByChatIdInMerchant(chatId);
   const me = await client.getMe();
@@ -161,7 +165,7 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
       params: { order_id: orderId }
     });
     const channelId = response.data?.channel_id || "未获得到渠道ID";
-    const channelOrderId = response.data?.channel_order_id || orderId;
+    const channelOrderId = response.data?.orderId;
     const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
 
     if (!targetChatIds.length) {
@@ -170,10 +174,8 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
         file: message.media,
         caption: `${channelOrderId}`
       });
-      await addOrUpdateOrder(errorSentMsg, message.id, chatId, channelId, orderId, channelOrderId);
+      await addOrUpdateOrder(errorSentMsg, message.id, chatId, channelId, channelOrderId);
       return;
-    }else if(channelOrderId === orderId){
-      await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 商户订单号:${orderId},未获得渠道单号` });
     }
     // 群发图片
     for (const targetChatId of targetChatIds) {
@@ -182,28 +184,9 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
           file: message.media,
           caption: `${channelOrderId}`
         });
-        //TODO: 这边添加表数据
-        //sentMsgId, merchantMsgId, merchantId, channelId, tgReplyId, merchantOrderId, channelOrderId
-        /*try {
-          const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, orderId, channelOrderId);
-          if (!exist) {
-            await tgDbService.insertOrderContext(sentMsg.id, message.id, chatId, channelId, orderId, channelOrderId);
-            console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${orderId}`);
-          } else {
-            await tgDbService.updateMsgIdsByOrderKey(sentMsg.id, message.id, chatId, channelId, orderId, channelOrderId);
-            console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${orderId}`);
-          }
-        } catch (err) {
-          console.error("❌ 插入 tg_order 失敗:", err.message);
-          return;
-        }*/
-        await addOrUpdateOrder(sentMsg.id,message.id,chatId, channelId, orderId, channelOrderId);
 
-        /*orderContextMap.set(sentMsg.id, {
-          orderId,//是什么id，这个是商户id？
-          originalMsgId: message.id,
-          fromChat: chatId//这个什么的id
-        });*/
+        await addOrUpdateOrder(sentMsg.id,message.id,chatId, channelId, channelOrderId);
+
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
         console.error(`Failed to send to ${targetChatId}:`, err.message);
@@ -244,9 +227,6 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
       console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
       await tgDbService.updateOrderStatusByChannelMsgId(replyToId, replyId);
     }
-    //TODO：这边可以改为修改订单的状态
-    //orderContextMap.delete(replyToId);
-    //await tgDbService.updateOrderStatusByChannelMsgId(replyToId,replyId);
   } else {
     console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
   }
@@ -293,15 +273,15 @@ function removeClientById(id) {
 }
 
 
-async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, channelId, orderId, channelOrderId) {
+async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, channelId, channelOrderId) {
   try {
-    const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, orderId, channelOrderId);
+    const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, channelOrderId);
     if (!exist) {
-      await tgDbService.insertOrderContext(channelMessageId, merchantMessageId, chatId, channelId, orderId, channelOrderId);
-      console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${orderId}`);
+      await tgDbService.insertOrderContext(channelMessageId, merchantMessageId, chatId, channelId, channelOrderId);
+      console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${channelOrderId}`);
     } else {
-      await tgDbService.updateMsgIdsByOrderKey(channelMessageId, merchantMessageId, chatId, channelId, orderId, channelOrderId);
-      console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${orderId}`);
+      await tgDbService.updateMsgIdsByOrderKey(channelMessageId, merchantMessageId, chatId, channelId, channelOrderId);
+      console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${channelOrderId}`);
     }
   } catch (err) {
     console.error("❌ 插入 tg_order 失敗:", err.message);
