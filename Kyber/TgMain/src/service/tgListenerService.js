@@ -10,6 +10,7 @@ const { getOrderByChannelMsgId } = require("./tgDbService");
 const orderContextMap = new Map();
 const clients = [];
 const ErrorGroupChatID = -4750453063;
+const orderChatId = -4856325360;
 
 // 启动所有账户监听
 async function startOrderListener() {
@@ -63,6 +64,20 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
+
+  // ----------- 命令查询“未处理”的订单 -----------
+  if (typeof message.message === "string" &&
+    chatId === orderChatId){
+    if (message.message === "/未处理"){
+      await handleNoProOrder(client, chatId, message);
+      return;
+    }
+
+    if (message.message.startsWith("/已处理:")){
+      await handleProOrder(client, chatId, message.message, message.id);
+      return;
+    }
+  }
 
   // ----------- 1. 标记渠道群 -----------
   if (
@@ -146,6 +161,10 @@ async function handleMarkMerchantGroup(client, chatId, chatTitle, text) {
 
 // ========== 来源群订单消息处理 ============
 async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
+  await client.sendMessage(chatId, {
+    message: "客户请等待，现在为你查询订单",
+    replyTo: message.id
+  });
   // 判断是否来源有效商户群 & 账号
   const relevantAccountIds = await tgDbService.getAccountIdsByChatIdInMerchant(chatId);
   const me = await client.getMe();
@@ -161,49 +180,28 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
       params: { order_id: orderId }
     });
     const channelId = response.data?.channel_id || "未获得到渠道ID";
-    const channelOrderId = response.data?.channel_order_id || orderId;
+    const merchantOrderId = response.data?.orderId;
     const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
 
     if (!targetChatIds.length) {
       await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
       const errorSentMsg = await client.sendFile(ErrorGroupChatID, {
         file: message.media,
-        caption: `${channelOrderId}`
+        caption: `${merchantOrderId}`
       });
-      await addOrUpdateOrder(errorSentMsg, message.id, chatId, channelId, orderId, channelOrderId);
+      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, merchantOrderId);
       return;
-    }else if(channelOrderId === orderId){
-      await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 商户订单号:${orderId},未获得渠道单号` });
     }
     // 群发图片
     for (const targetChatId of targetChatIds) {
       try {
         const sentMsg = await client.sendFile(targetChatId, {
           file: message.media,
-          caption: `${channelOrderId}`
+          caption: `${merchantOrderId}`
         });
-        //TODO: 这边添加表数据
-        //sentMsgId, merchantMsgId, merchantId, channelId, tgReplyId, merchantOrderId, channelOrderId
-        /*try {
-          const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, orderId, channelOrderId);
-          if (!exist) {
-            await tgDbService.insertOrderContext(sentMsg.id, message.id, chatId, channelId, orderId, channelOrderId);
-            console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${orderId}`);
-          } else {
-            await tgDbService.updateMsgIdsByOrderKey(sentMsg.id, message.id, chatId, channelId, orderId, channelOrderId);
-            console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${orderId}`);
-          }
-        } catch (err) {
-          console.error("❌ 插入 tg_order 失敗:", err.message);
-          return;
-        }*/
-        await addOrUpdateOrder(sentMsg.id,message.id,chatId, channelId, orderId, channelOrderId);
 
-        /*orderContextMap.set(sentMsg.id, {
-          orderId,//是什么id，这个是商户id？
-          originalMsgId: message.id,
-          fromChat: chatId//这个什么的id
-        });*/
+        await addOrUpdateOrder(sentMsg.id,message.id,chatId, channelId, merchantOrderId);
+
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
         console.error(`Failed to send to ${targetChatId}:`, err.message);
@@ -244,9 +242,6 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
       console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
       await tgDbService.updateOrderStatusByChannelMsgId(replyToId, replyId);
     }
-    //TODO：这边可以改为修改订单的状态
-    //orderContextMap.delete(replyToId);
-    //await tgDbService.updateOrderStatusByChannelMsgId(replyToId,replyId);
   } else {
     console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
   }
@@ -293,19 +288,109 @@ function removeClientById(id) {
 }
 
 
-async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, channelId, orderId, channelOrderId) {
+async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, channelId, merchantOrderId) {
   try {
-    const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, orderId, channelOrderId);
+    const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, merchantOrderId);
     if (!exist) {
-      await tgDbService.insertOrderContext(channelMessageId, merchantMessageId, chatId, channelId, orderId, channelOrderId);
-      console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${orderId}`);
+      await tgDbService.insertOrderContext(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId);
+      console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${merchantOrderId}`);
     } else {
-      await tgDbService.updateMsgIdsByOrderKey(channelMessageId, merchantMessageId, chatId, channelId, orderId, channelOrderId);
-      console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${orderId}`);
+      await tgDbService.updateMsgIdsByOrderKey(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId);
+      console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${merchantOrderId}`);
     }
   } catch (err) {
-    console.error("❌ 插入 tg_order 失敗:", err.message);
+    console.error(" 插入 tg_order 失敗:", err.message);
     return;
+  }
+}
+
+/**
+ * 处理订单状态为0，并转发
+ * @param client
+ * @param chatId
+ * @param message
+ * @returns {Promise<void>}
+ */
+async function handleNoProOrder(client, chatId, message) {
+
+  const orders = await tgDbService.getPendingOrders();
+
+  if (!orders || orders.length ===0){
+    await client.sendMessage(chatId,{
+      message:"当前没有未处理的订单",
+      replyTo:message.id
+    })
+    return;
+  }
+
+  let text = `共取得${orders.length}等待处理订单：\n\n`;
+  orders.forEach((order, index) => {
+    text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
+  });
+
+  await client.sendMessage(chatId, {
+    message: text,
+    replyTo: message.id
+  });
+}
+
+async function handleProOrder(client, chatId, message) {
+
+  const orders = await tgDbService.getPendingOrders();
+
+  if (!orders || orders.length ===0){
+    await client.sendMessage(chatId,{
+      message:"当前没有未处理的订单",
+      replyTo:message.id
+    })
+    return;
+  }
+
+  let text = `共取得${orders.length}等待处理订单：\n\n`;
+  orders.forEach((order, index) => {
+    text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
+  });
+
+  await client.sendMessage(chatId, {
+    message: text,
+    replyTo: message.id
+  });
+}
+
+async function handleProOrder(client, chatId, text, replyToMessageId) {
+  const parts = text.split(':');
+  const orderId = parts[1]?.trim();
+
+  if (!orderId) {
+    await client.sendMessage(chatId, {
+      message: "❌ 订单号格式错误，请使用 /已处理:订单号",
+      replyTo: replyToMessageId
+    });
+    return;
+  }
+
+  const result = await tgDbService.checkAndProcessOrder(orderId);
+
+  if (!result.found) {
+    await client.sendMessage(chatId, {
+      message: `⚠️ 未找到订单号 ${orderId}，请确认是否正确。`,
+      replyTo: replyToMessageId
+    });
+  } else if (result.alreadyProcessed) {
+    await client.sendMessage(chatId, {
+      message: `✅ 订单 ${orderId} 已经处理过了，无需重复操作。`,
+      replyTo: replyToMessageId
+    });
+  } else if (result.updated) {
+    await client.sendMessage(chatId, {
+      message: `✅ 订单 ${orderId} 已成功标记为已处理！`,
+      replyTo: replyToMessageId
+    });
+  } else {
+    await client.sendMessage(chatId, {
+      message: `❗ 订单 ${orderId} 标记失败，请稍后重试。`,
+      replyTo: replyToMessageId
+    });
   }
 }
 
