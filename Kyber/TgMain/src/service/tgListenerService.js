@@ -10,6 +10,7 @@ const { getOrderByChannelMsgId } = require("./tgDbService");
 const orderContextMap = new Map();
 const clients = [];
 const ErrorGroupChatID = -4750453063;
+const orderChatId = -4856325360;
 
 // 启动所有账户监听
 async function startOrderListener() {
@@ -63,6 +64,20 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
+
+  // ----------- 命令查询“未处理”的订单 -----------
+  if (typeof message.message === "string" &&
+    chatId === orderChatId){
+    if (message.message === "/未处理"){
+      await handleNoProOrder(client, chatId, message);
+      return;
+    }
+
+    if (message.message.startsWith("/已处理:")){
+      await handleProOrder(client, chatId, message.message, message.id);
+      return;
+    }
+  }
 
   // ----------- 1. 标记渠道群 -----------
   if (
@@ -284,8 +299,98 @@ async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, chann
       console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${merchantOrderId}`);
     }
   } catch (err) {
-    console.error("❌ 插入 tg_order 失敗:", err.message);
+    console.error(" 插入 tg_order 失敗:", err.message);
     return;
+  }
+}
+
+/**
+ * 处理订单状态为0，并转发
+ * @param client
+ * @param chatId
+ * @param message
+ * @returns {Promise<void>}
+ */
+async function handleNoProOrder(client, chatId, message) {
+
+  const orders = await tgDbService.getPendingOrders();
+
+  if (!orders || orders.length ===0){
+    await client.sendMessage(chatId,{
+      message:"当前没有未处理的订单",
+      replyTo:message.id
+    })
+    return;
+  }
+
+  let text = `共取得${orders.length}等待处理订单：\n\n`;
+  orders.forEach((order, index) => {
+    text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
+  });
+
+  await client.sendMessage(chatId, {
+    message: text,
+    replyTo: message.id
+  });
+}
+
+async function handleProOrder(client, chatId, message) {
+
+  const orders = await tgDbService.getPendingOrders();
+
+  if (!orders || orders.length ===0){
+    await client.sendMessage(chatId,{
+      message:"当前没有未处理的订单",
+      replyTo:message.id
+    })
+    return;
+  }
+
+  let text = `共取得${orders.length}等待处理订单：\n\n`;
+  orders.forEach((order, index) => {
+    text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
+  });
+
+  await client.sendMessage(chatId, {
+    message: text,
+    replyTo: message.id
+  });
+}
+
+async function handleProOrder(client, chatId, text, replyToMessageId) {
+  const parts = text.split(':');
+  const orderId = parts[1]?.trim();
+
+  if (!orderId) {
+    await client.sendMessage(chatId, {
+      message: "❌ 订单号格式错误，请使用 /已处理:订单号",
+      replyTo: replyToMessageId
+    });
+    return;
+  }
+
+  const result = await tgDbService.checkAndProcessOrder(orderId);
+
+  if (!result.found) {
+    await client.sendMessage(chatId, {
+      message: `⚠️ 未找到订单号 ${orderId}，请确认是否正确。`,
+      replyTo: replyToMessageId
+    });
+  } else if (result.alreadyProcessed) {
+    await client.sendMessage(chatId, {
+      message: `✅ 订单 ${orderId} 已经处理过了，无需重复操作。`,
+      replyTo: replyToMessageId
+    });
+  } else if (result.updated) {
+    await client.sendMessage(chatId, {
+      message: `✅ 订单 ${orderId} 已成功标记为已处理！`,
+      replyTo: replyToMessageId
+    });
+  } else {
+    await client.sendMessage(chatId, {
+      message: `❗ 订单 ${orderId} 标记失败，请稍后重试。`,
+      replyTo: replyToMessageId
+    });
   }
 }
 

@@ -192,8 +192,7 @@ const getReplyText = async (matchRule) => {
   const sql = `
       SELECT id, reply_text
       FROM tg_reply
-      WHERE ? LIKE CONCAT('%', match_rule, '%')
-          LIMIT 1
+      WHERE ? LIKE CONCAT('%', match_rule, '%') LIMIT 1
   `;
   const results = await queryAsync(sql, [matchRule]);
   return results.length > 0 ? results[0] : null;
@@ -302,8 +301,7 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
                             channel_group_id,
                             status,
                             created_time,
-                            merchant_order_id
-                            )
+                            merchant_order_id)
       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
   `;
 
@@ -313,7 +311,7 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
     merchantChatId,
     channelGroupId,
     0, // status 設為 0
-    merchantOrderId,
+    merchantOrderId
   ];
 
   const result = await queryAsync(sql, values);
@@ -335,7 +333,7 @@ const getOrderByChannelMsgId = async (channelMsgId) => {
  * @param newStatus
  * @returns {Promise<*>}
  */
-const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
+const updateOrderStatusByChannelMsgId = async (channelMsgId, replyId) => {
   let sql = `
       UPDATE tg_order
       SET status = 1
@@ -353,7 +351,7 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
 
   try {
     const result = await queryAsync(sql, values);
-    console.log(`[INFO] 已将 channel_msg_id=${channelMsgId} 的订单更新为 status=1${replyId != null ? `, reply_id=${replyId}` : ''}，影响笔数: ${result.affectedRows}`);
+    console.log(`[INFO] 已将 channel_msg_id=${channelMsgId} 的订单更新为 status=1${replyId != null ? `, reply_id=${replyId}` : ""}，影响笔数: ${result.affectedRows}`);
     return result.affectedRows;
   } catch (err) {
     console.error(`[ERROR] 更新订单状态失败: ${err.message}`);
@@ -395,12 +393,58 @@ const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchan
     newMerchantMsgId,
     merchantChatId,
     channelGroupId,
-    merchantOrderId,
+    merchantOrderId
   ];
 
   const result = await queryAsync(sql, values);
   return result.affectedRows;
 };
+
+/**
+ * 查询“未处理”的订单
+ * @returns {Promise<unknown>}
+ */
+const getPendingOrders = async () => {
+  const sql = `SELECT *
+               FROM tg_order
+               WHERE status = 0
+               ORDER BY id ASC
+               LIMIT 20`;
+  const results = await queryAsync(sql);
+  return results;
+};
+
+/**
+ * 检验用户状态，并修改用户状态
+ * @param merchantOrderId
+ * @returns {Promise<void>}
+ */
+const checkAndProcessOrder = async (merchantOrderId) => {
+
+  const selectSql = `SELECT id,status FROM tg_order WHERE merchant_order_id = ? LIMIT 1`;
+  const orders = await queryAsync(selectSql,[merchantOrderId]);
+
+  if (!orders || orders.length === 0){
+    return { found:false};
+  }
+
+  const order = orders[0];
+  if (order.status !== 0) {
+    return { found: true, alreadyProcessed: true };
+  }
+
+  // 2. 更新状态
+  const updateSql = `UPDATE tg_order SET status = 1 WHERE id = ?`;
+  const result = await queryAsync(updateSql, [order.id]);
+
+  if (result.affectedRows > 0) {
+    return { found: true, updated: true };
+  } else {
+    return { found: true, updated: false };
+  }
+}
+
+
 
 
 // 统一导出
@@ -429,5 +473,7 @@ module.exports = {
   getOrderByChannelMsgId,
   updateOrderStatusByChannelMsgId,
   getOrderByMeChMoCo,
-  updateMsgIdsByOrderKey
+  updateMsgIdsByOrderKey,
+  getPendingOrders,
+  checkAndProcessOrder
 };
