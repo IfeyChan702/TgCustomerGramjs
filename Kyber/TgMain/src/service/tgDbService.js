@@ -189,9 +189,12 @@ const getLatestAccountIds = async () => {
  * 查找回复文本（根据匹配规则）
  */
 const getReplyText = async (matchRule) => {
-  const sql = `SELECT id,reply_text
-               FROM tg_reply
-               WHERE match_rule = ? LIMIT 1`;
+  const sql = `
+      SELECT id, reply_text
+      FROM tg_reply
+      WHERE ? LIKE CONCAT('%', match_rule, '%')
+          LIMIT 1
+  `;
   const results = await queryAsync(sql, [matchRule]);
   return results.length > 0 ? results[0] : null;
 };
@@ -290,12 +293,13 @@ const getAccountIdByTelegramId = async (telegramId) => {
 /**
  * 添加order数据
  */
-const insertOrderContext = async (channelMsgId, merchantMsgId, merchantId, channelId, merchantOrderId, channelOrderId) => {
+const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, channelGroupId, merchantOrderId, channelOrderId) => {
+
   const sql = `
       INSERT INTO tg_order (channel_msg_id,
                             merchant_msg_id,
-                            merchant_id,
-                            channel_id,
+                            merchant_chat_id,
+                            channel_group_id,
                             status,
                             created_time,
                             merchant_order_id,
@@ -306,8 +310,8 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantId, chann
   const values = [
     channelMsgId,
     merchantMsgId,
-    merchantId,
-    channelId,
+    merchantChatId,
+    channelGroupId,
     0, // status 設為 0
     merchantOrderId,
     channelOrderId
@@ -361,16 +365,16 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
 /**
  * 根据 merchantId, channelId, merchantOrderId, channelOrderId
  */
-const getOrderByMeChMoCo = async (merchantId, channelId, merchantOrderId, channelOrderId) => {
+const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderId, channelOrderId) => {
   const sql = `SELECT COUNT(*) AS count
                FROM tg_order
-               WHERE merchant_id = ?
-                 AND channel_id = ?
+               WHERE merchant_chat_id = ?
+                 AND channel_group_id = ?
                  AND merchant_order_id = ?
                  AND channel_order_id = ? `;
   const values = [
-    merchantId,
-    channelId,
+    merchantChatId,
+    channelGroupId,
     merchantOrderId,
     channelOrderId
   ];
@@ -380,21 +384,21 @@ const getOrderByMeChMoCo = async (merchantId, channelId, merchantOrderId, channe
 /**
  * 根据merchantId,channelId,merchantOrderId,channelOrderId这四个字段，修改channel_msg_id，merchant_msg_id这两个字段
  */
-const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantId, channelId, merchantOrderId, channelOrderId) => {
+const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantChatId, channelGroupId, merchantOrderId, channelOrderId) => {
   const sql = `
       UPDATE tg_order
       SET channel_msg_id  = ?,
           merchant_msg_id = ?
-      WHERE merchant_id = ?
-        AND channel_id = ?
+      WHERE merchant_chat_id = ?
+        AND channel_group_id = ?
         AND merchant_order_id = ?
         AND channel_order_id = ?
   `;
   const values = [
     newChannelMsgId,
     newMerchantMsgId,
-    merchantId,
-    channelId,
+    merchantChatId,
+    channelGroupId,
     merchantOrderId,
     channelOrderId
   ];
@@ -402,6 +406,7 @@ const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchan
   const result = await queryAsync(sql, values);
   return result.affectedRows;
 };
+
 
 // 统一导出
 module.exports = {

@@ -44,4 +44,15 @@ router.delete('/tg-merchant/:id', async (req, res) => {
   }
 });
 
+//查询全部的商户id，商户聊天室的id，商户名称
+router.get('/tg-merchant/list',async (req,res) => {
+  try {
+    const result = await tgMerchantService.getAllMerchantForSelect();
+    res.json(success(result))
+  }catch (err){
+    res.json(fail(err.message));
+  }
+})
+
+
 module.exports = router;
