@@ -189,7 +189,7 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
         file: message.media,
         caption: `${merchantOrderId}`
       });
-      await addOrUpdateOrder(errorSentMsg, message.id, chatId, channelId, merchantOrderId);
+      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, merchantOrderId);
       return;
     }
     // 群发图片
