@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 const env = process.env.NODE_ENV || 'development';
 const envPath = path.resolve(__dirname, `../.env.${env}`);
 dotenv.config({ path: envPath });
-
+process.env.DEBUG = 'gramjs:*';
 const app = require('./app');
 
 const PORT = process.env.PORT || 8087;
