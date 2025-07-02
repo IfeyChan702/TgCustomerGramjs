@@ -2,15 +2,18 @@ const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 const { Api } = require("telegram");
+const { Markup } = require("telegram");
 const { startRedis, redis } = require("../models/redisModel");
 const axios = require("axios");
 const tgDbService = require("./tgDbService");
 const { getOrderByChannelMsgId } = require("./tgDbService");
+const { off } = require("process");
+const { call } = require("express");
+const { withRedisLock } = require("../utils/lockUtil");
 
-const orderContextMap = new Map();
 const clients = [];
 const ErrorGroupChatID = -4750453063;
-const orderChatId = -4856325360;
+const ADMIN_USER_IDS = ["12345678"];
 
 // 启动所有账户监听
 async function startOrderListener() {
@@ -64,19 +67,48 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
+  const data = event.data?.toString();
 
   // ----------- 命令查询“未处理”的订单 -----------
-  if (typeof message.message === "string" &&
-    chatId === orderChatId){
-    if (message.message === "/未处理"){
-      await handleNoProOrder(client, chatId, message);
-      return;
+  if (typeof message.message === "string"
+  ) {
+    //0是关闭，1是开启
+    //orderChatId
+    if (chatId === ErrorGroupChatID) {
+      if (message.message === "/未处理") {
+        await withRedisLock(redis, `lock:noproc:${chatId},${message.id}`, 10, async () => {
+          await handleNoProOrder(client, chatId, message,senderTelegramID);
+        });
+        return;
+      }
+
+      if (message.message.startsWith("/已处理:")) {
+        await withRedisLock(redis, `lock:proc:${chatId}`, 10, async () => {
+          await handleProOrder(client, chatId, message);
+        });
+        return;
+      }
+
+      //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
+      if (!isAuthorized(sender)) {
+        if (message.message === "/start") {
+          await handleStartOrder(client, chatId);
+          return;
+        }
+
+        if (message.message.startsWith("/start_")) {
+          await handleStartOrderByID(client, chatId, message);
+          return;
+        }
+
+        if ("/stop") {
+          await handleStopOrder();
+          return;
+        }
+      }
+
     }
 
-    if (message.message.startsWith("/已处理:")){
-      await handleProOrder(client, chatId, message.message, message.id);
-      return;
-    }
   }
 
   // ----------- 1. 标记渠道群 -----------
@@ -107,7 +139,7 @@ async function handleEvent(client, event) {
     typeof message.message === "string" &&
     message.message.trim().length > 0
   ) {
-    await handleMerchantOrderMessage(client, chatId, message, chatTitle);
+    await handleMerchantOrderMessage(client, chatId, message);
     return;
   }
 
@@ -160,11 +192,7 @@ async function handleMarkMerchantGroup(client, chatId, chatTitle, text) {
 }
 
 // ========== 来源群订单消息处理 ============
-async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
-  await client.sendMessage(chatId, {
-    message: "客户请等待，现在为你查询订单",
-    replyTo: message.id
-  });
+async function handleMerchantOrderMessage(client, chatId, message) {
   // 判断是否来源有效商户群 & 账号
   const relevantAccountIds = await tgDbService.getAccountIdsByChatIdInMerchant(chatId);
   const me = await client.getMe();
@@ -172,6 +200,11 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
   const sourceGroupIds = await tgDbService.getAllChatIdsInMerchant();
 
   if (!sourceGroupIds.has(String(chatId)) || !relevantAccountIds.has(accountIdFromClient)) return;
+
+  await client.sendMessage(chatId, {
+    message: "客户请等待，现在为你查询订单",
+    replyTo: message.id
+  });
 
   const orderId = message.message.trim();
   console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
@@ -200,7 +233,7 @@ async function handleMerchantOrderMessage(client, chatId, message, chatTitle) {
           caption: `${merchantOrderId}`
         });
 
-        await addOrUpdateOrder(sentMsg.id,message.id,chatId, channelId, merchantOrderId);
+        await addOrUpdateOrder(sentMsg.id, message.id, chatId, channelId, merchantOrderId);
 
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
@@ -219,7 +252,6 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
   if (!channelGroupIds.has(String(chatId))) return;
 
   const replyToId = message.replyTo.replyToMsgId;
-  //TODO:从数据库里面根据sentMsg.id拿到数据
   const context = await tgDbService.getOrderByChannelMsgId(replyToId);
   //const context = orderContextMap.get(replyToId);
 
@@ -287,8 +319,16 @@ function removeClientById(id) {
   }
 }
 
+/**
+ * 权限处理
+ * @param userId
+ * @returns {*}
+ */
+function isAuthorized(userId) {
+  return ADMIN_USER_IDS.includes(userId);
+}
 
-async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, channelId, merchantOrderId) {
+async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId) {
   try {
     const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, merchantOrderId);
     if (!exist) {
@@ -311,15 +351,15 @@ async function addOrUpdateOrder(channelMessageId,merchantMessageId,chatId, chann
  * @param message
  * @returns {Promise<void>}
  */
-async function handleNoProOrder(client, chatId, message) {
+async function handleNoProOrder(client, chatId, message,telegramId) {
 
   const orders = await tgDbService.getPendingOrders();
 
-  if (!orders || orders.length ===0){
-    await client.sendMessage(chatId,{
-      message:"当前没有未处理的订单",
-      replyTo:message.id
-    })
+  if (!orders || orders.length === 0) {
+    await client.sendMessage(chatId, {
+      message: "当前没有未处理的订单",
+      replyTo: message.id
+    });
     return;
   }
 
@@ -334,31 +374,15 @@ async function handleNoProOrder(client, chatId, message) {
   });
 }
 
-async function handleProOrder(client, chatId, message) {
-
-  const orders = await tgDbService.getPendingOrders();
-
-  if (!orders || orders.length ===0){
-    await client.sendMessage(chatId,{
-      message:"当前没有未处理的订单",
-      replyTo:message.id
-    })
-    return;
-  }
-
-  let text = `共取得${orders.length}等待处理订单：\n\n`;
-  orders.forEach((order, index) => {
-    text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
-  });
-
-  await client.sendMessage(chatId, {
-    message: text,
-    replyTo: message.id
-  });
-}
-
-async function handleProOrder(client, chatId, text, replyToMessageId) {
-  const parts = text.split(':');
+/**
+ * 处理"订单已完成"
+ * @param client
+ * @param chatId
+ * @param text
+ * @returns {Promise<void>}
+ */
+async function handleProOrder(client, chatId, text) {
+  const parts = text.split(":");
   const orderId = parts[1]?.trim();
 
   if (!orderId) {
@@ -393,6 +417,92 @@ async function handleProOrder(client, chatId, text, replyToMessageId) {
     });
   }
 }
+
+/**
+ * 处理"/start"命令
+ * @returns {Promise<void>}
+ */
+async function handleStartOrder(client, chatId) {
+  //这里有问题
+  const availableAcc = await tgDbService.getAccountByIsRunning(0);
+  if (!availableAcc || availableAcc.length === 0) {
+    await client.sendMessage(chatId, {
+      message: "⚠️ 账号都已经开启！"
+    });
+    return;
+  }
+  let msg = "未开启的用户列表：\n\n";
+  availableAcc.forEach((acc, idx) => {
+    msg += `${idx + 1}.用户ID：${acc.id}\n`;
+  });
+  msg += `\n请输入"start_"+用户ID，就可以开启用户`;
+  client.sendMessage(chatId, {
+    message: msg
+  });
+}
+
+/**
+ *
+ * @param client
+ * @param chatId
+ * @param message
+ * @returns {Promise<void>}
+ */
+async function handleStartOrderByID(client, chatId, message) {
+  try {
+    const accId = message.message.split("_")[1].trim();
+    if (await tgDbService.isAccountExistsWithStatus(accId, 0)) {
+      //TODO 这里可能需要再修改用户状态
+      await startListener(accId);
+      client.SendMessage(chatId, {
+        message: `开启成功，用户${accId}成功开启`
+      });
+    }
+    client.SendMessage(chatId, {
+      message: `开启失败，用户${accId}已经是开启状态`
+    });
+  } catch (e) {
+    console.log();
+  }
+}
+
+/**
+ * 处理"/stop"命令
+ * @returns {Promise<void>}
+ */
+async function handleStopOrder() {
+
+}
+
+//
+async function showConnectedTelegramUsers(client, chatId) {
+  if (!clients || clients.length === 0) {
+    await client.sendMessage(chatId, {
+      message: "⚠️ 当前没有任何连接中的账号。"
+    });
+    return;
+  }
+
+  let text = "📡 当前连接中的 Telegram 用户列表：\n\n";
+
+  for (const entry of clients) {
+    try {
+      const user = await entry.client.getMe();
+      text += `🟢 ID: ${user.id}\n`;
+      text += `👤 名称: ${user.firstName ?? ""} ${user.lastName ?? ""}\n`;
+      text += `📛 用户名: @${user.username ?? "（无）"}\n`;
+      text += `🆔 本地标识: ${entry.id}\n`;
+      text += `──────────────\n`;
+    } catch (err) {
+      text += `⚠️ 无法获取账号 ID ${entry.id} 的信息（连接异常）\n──────────────\n`;
+    }
+  }
+
+  await client.sendMessage(chatId, {
+    message: text.trim()
+  });
+}
+
 
 // =================== 模块导出 ====================
 module.exports = {

@@ -408,8 +408,7 @@ const getPendingOrders = async () => {
   const sql = `SELECT *
                FROM tg_order
                WHERE status = 0
-               ORDER BY id ASC
-               LIMIT 20`;
+               ORDER BY id ASC LIMIT 20`;
   const results = await queryAsync(sql);
   return results;
 };
@@ -421,11 +420,13 @@ const getPendingOrders = async () => {
  */
 const checkAndProcessOrder = async (merchantOrderId) => {
 
-  const selectSql = `SELECT id,status FROM tg_order WHERE merchant_order_id = ? LIMIT 1`;
-  const orders = await queryAsync(selectSql,[merchantOrderId]);
+  const selectSql = `SELECT id, status
+                     FROM tg_order
+                     WHERE merchant_order_id = ? LIMIT 1`;
+  const orders = await queryAsync(selectSql, [merchantOrderId]);
 
-  if (!orders || orders.length === 0){
-    return { found:false};
+  if (!orders || orders.length === 0) {
+    return { found: false };
   }
 
   const order = orders[0];
@@ -434,7 +435,9 @@ const checkAndProcessOrder = async (merchantOrderId) => {
   }
 
   // 2. 更新状态
-  const updateSql = `UPDATE tg_order SET status = 1 WHERE id = ?`;
+  const updateSql = `UPDATE tg_order
+                     SET status = 1
+                     WHERE id = ?`;
   const result = await queryAsync(updateSql, [order.id]);
 
   if (result.affectedRows > 0) {
@@ -442,9 +445,25 @@ const checkAndProcessOrder = async (merchantOrderId) => {
   } else {
     return { found: true, updated: false };
   }
-}
+};
+/**
+ * 根据 status 查找账户信息
+ */
+const getAccountByIsRunning = async (isRunning) => {
+  const sql = `SELECT id
+               FROM tg_accounts
+               WHERE is_running = ?`;
+  return await queryAsync(sql, [isRunning]);
+};
 
-
+/**
+ * 根据ID和status为0查找数据
+ */
+const isAccountExistsWithStatus = async (id, accStatus) => {
+  const sql = `SELECT 1 FROM tg_accounts WHERE id = ? AND status = ? LIMIT 1`;
+  const result = await queryAsync(sql, [id, accStatus]);
+  return result.length > 0;
+};
 
 
 // 统一导出
@@ -475,5 +494,7 @@ module.exports = {
   getOrderByMeChMoCo,
   updateMsgIdsByOrderKey,
   getPendingOrders,
-  checkAndProcessOrder
+  checkAndProcessOrder,
+  getAccountByIsRunning,
+  isAccountExistsWithStatus
 };

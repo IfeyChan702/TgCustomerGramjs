@@ -12,7 +12,7 @@ exports.getPageOrders = (params = {}) => {
       page = 1,
       size = 10,
       status = null,
-      merchantId = null,
+      merchantChatId = null,
       channelId = null,
       startTime = null,
       endTime = null
@@ -36,10 +36,10 @@ exports.getPageOrders = (params = {}) => {
       countValues.push(status);
     }
 
-    if (merchantId !== null) {
+    if (merchantChatId !== null) {
       baseSQL += ` AND o.merchant_chat_id = ?`;
-      values.push(merchantId);
-      countValues.push(merchantId);
+      values.push(merchantChatId);
+      countValues.push(merchantChatId);
     }
 
     if (channelId !== null) {
@@ -96,7 +96,7 @@ exports.insertOrder = (order) => {
     const sql = `
         INSERT INTO tg_order
         (channel_msg_id, merchant_msg_id, merchant_chat_id, channel_group_id, status, created_time, merchant_order_id,
-         channel_order_id, tg_reply_id)
+         tg_reply_id)
         VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?)
     `;
 
@@ -107,15 +107,43 @@ exports.insertOrder = (order) => {
       order.channel_group_id,
       0, // 默认 status 为 0（未处理）
       order.merchant_order_id ?? null,
-      order.channel_order_id ?? null,
       order.tg_reply_id ?? null
     ];
 
-    db.query(sql,values,(err,result) => {
+    db.query(sql, values, (err, result) => {
       if (err) return reject(err);
       resolve(result);
-    })
+    });
   });
 };
+
+/**
+ * 删除订单（根据订单主键id）
+ * @param id
+ * @returns {Promise<unknown>}
+ */
+exports.deleteOrderById = (id) => {
+  return new Promise((resolve, reject) => {
+    const sql = `DELETE
+                 FROM tg_order
+                 WHERE id = ?`;
+
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+/**
+ * 修改订单
+ * @param order
+ * @returns {Promise<unknown>}
+ */
+exports.updateOrder = (order) => {
+  return new Promise((resolve, reject) => {
+
+  });
+};
+
 
 

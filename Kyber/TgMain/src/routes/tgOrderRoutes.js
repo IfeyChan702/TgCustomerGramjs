@@ -3,7 +3,9 @@ const router = express.Router();
 const tgOrderService = require("../service/tgOrderService");
 const { success, fail } = require("../utils/responseWrapper");
 
-// 分页+模糊+过滤 查询订单
+/**
+ * 模糊查询、条件查询，分页查询--订单数据
+ */
 router.get("/tg-order", async (req, res) => {
   try {
     const {
@@ -35,6 +37,9 @@ router.get("/tg-order", async (req, res) => {
   }
 });
 
+/**
+ * 插入订单数据
+ */
 router.post("/tg_order", async (req, res) => {
   try {
     const {
@@ -43,7 +48,6 @@ router.post("/tg_order", async (req, res) => {
       merchantChatId,
       channelGroupId,
       merchantOrderId = null,
-      channelOrderId = null,
       tgReplyId = null
     } = req.body;
 
@@ -62,7 +66,6 @@ router.post("/tg_order", async (req, res) => {
       merchantChatId,
       channelGroupId,
       merchantOrderId,
-      channelOrderId,
       tgReplyId
     });
 
@@ -72,5 +75,29 @@ router.post("/tg_order", async (req, res) => {
     res.json(fail((err.message)));
   }
 });
+/**
+ * 根据id删除订单
+ */
+router.delete("/tg_order",async (req,res) => {
+  try {
+    const { id } = req.body;
+
+    if (!id){
+      return res.json(fail("订单 id 为空"));
+    }
+
+    const result = await tgOrderService.deleteOrderById(id);
+
+    if (result.affectedRows === 0){
+      return  res.json(fail("未找到这笔订单，删除失败"));
+    }
+
+    res.json(success("订单删除成功!"));
+  }catch (err){
+    console.error("[ERROR] 删除订单失败：",err);
+    res.json(fail(err.message));
+  }
+});
+
 
 module.exports = router;
