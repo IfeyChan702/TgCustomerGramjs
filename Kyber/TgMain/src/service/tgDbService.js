@@ -457,7 +457,7 @@ const getAccountByIsRunning = async (isRunning) => {
 };
 
 /**
- * 根据ID和status为0查找数据
+ * 根据ID和status查找数据
  */
 const isAccountExistsWithStatus = async (id, accStatus) => {
   const sql = `SELECT 1 FROM tg_accounts WHERE id = ? AND status = ? LIMIT 1`;
@@ -486,6 +486,7 @@ const updateRunningByAccId = async (accId, isRunning) => {
     throw err;
   }
 };
+
 
 
 // 统一导出

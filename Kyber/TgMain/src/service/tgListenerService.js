@@ -509,13 +509,43 @@ async function handleStartOrderByID(client, chatId, message) {
  * @returns {Promise<void>}
  */
 async function handleStopOrderByID(client, chatId, message) {
-  const parts = message.message?.split("_");
-  if (!parts || parts.length < 2) {
+  try {
+    const parts = message.message?.split("_");
+    if (!parts || parts.length < 2) {
+      return client.SendMessage(chatId, {
+        message: `关闭用户指令错误，应为 "/stop_"+用户id`
+      });
+    }
+
+    const accId = parts[1].trim();
+
+    const isRunning = await tgDbService.isAccountExistsWithStatus(accId, 1);
+    if (!isRunning) {
+      return client.SendMessage(chatId, {
+        message: `⚠️ 用户 ${accId} 当前未运行，无需关闭`
+      });
+    }
+
+    const runningAccounts = await tgDbService.getAccountByIsRunning(1);
+    if (runningAccounts.length <= 1) {
+      return client.SendMessage(chatId, {
+        message: `❌ 只剩下最后一个正在运行的用户，无法关闭`
+      });
+    }
+
+    await tgDbService.updateRunningByAccId(accId, 0);
+    await stopListener(accId); // 如果你有 stopListener 函数，这里调用
+
     return client.SendMessage(chatId, {
-      message: `开启用户指令错误,"/stop_"+用户id`
+      message: `✅ 用户 ${accId} 已成功关闭`
+    });
+
+  } catch (e) {
+    console.error(`[ERROR] 关闭用户失败:`, e);
+    return client.SendMessage(chatId, {
+      message: `系统错误，关闭用户失败：${e.message || e}`
     });
   }
-
 }
 
 
