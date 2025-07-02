@@ -192,8 +192,7 @@ const getReplyText = async (matchRule) => {
   const sql = `
       SELECT id, reply_text
       FROM tg_reply
-      WHERE ? LIKE CONCAT('%', match_rule, '%')
-          LIMIT 1
+      WHERE ? LIKE CONCAT('%', match_rule, '%') LIMIT 1
   `;
   const results = await queryAsync(sql, [matchRule]);
   return results.length > 0 ? results[0] : null;
@@ -293,7 +292,7 @@ const getAccountIdByTelegramId = async (telegramId) => {
 /**
  * 添加order数据
  */
-const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, channelGroupId, merchantOrderId, channelOrderId) => {
+const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, channelGroupId, merchantOrderId) => {
 
   const sql = `
       INSERT INTO tg_order (channel_msg_id,
@@ -302,9 +301,8 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
                             channel_group_id,
                             status,
                             created_time,
-                            merchant_order_id,
-                            channel_order_id)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+                            merchant_order_id)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
   `;
 
   const values = [
@@ -313,8 +311,7 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
     merchantChatId,
     channelGroupId,
     0, // status 設為 0
-    merchantOrderId,
-    channelOrderId
+    merchantOrderId
   ];
 
   const result = await queryAsync(sql, values);
@@ -336,7 +333,7 @@ const getOrderByChannelMsgId = async (channelMsgId) => {
  * @param newStatus
  * @returns {Promise<*>}
  */
-const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
+const updateOrderStatusByChannelMsgId = async (channelMsgId, replyId) => {
   let sql = `
       UPDATE tg_order
       SET status = 1
@@ -354,7 +351,7 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
 
   try {
     const result = await queryAsync(sql, values);
-    console.log(`[INFO] 已将 channel_msg_id=${channelMsgId} 的订单更新为 status=1${replyId != null ? `, reply_id=${replyId}` : ''}，影响笔数: ${result.affectedRows}`);
+    console.log(`[INFO] 已将 channel_msg_id=${channelMsgId} 的订单更新为 status=1${replyId != null ? `, reply_id=${replyId}` : ""}，影响笔数: ${result.affectedRows}`);
     return result.affectedRows;
   } catch (err) {
     console.error(`[ERROR] 更新订单状态失败: ${err.message}`);
@@ -365,18 +362,16 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId,replyId) => {
 /**
  * 根据 merchantId, channelId, merchantOrderId, channelOrderId
  */
-const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderId, channelOrderId) => {
+const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderId) => {
   const sql = `SELECT COUNT(*) AS count
                FROM tg_order
                WHERE merchant_chat_id = ?
                  AND channel_group_id = ?
-                 AND merchant_order_id = ?
-                 AND channel_order_id = ? `;
+                 AND merchant_order_id = ?`;
   const values = [
     merchantChatId,
     channelGroupId,
-    merchantOrderId,
-    channelOrderId
+    merchantOrderId
   ];
   const results = await queryAsync(sql, values);
   return results[0].count > 0;
@@ -384,7 +379,7 @@ const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderI
 /**
  * 根据merchantId,channelId,merchantOrderId,channelOrderId这四个字段，修改channel_msg_id，merchant_msg_id这两个字段
  */
-const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantChatId, channelGroupId, merchantOrderId, channelOrderId) => {
+const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantChatId, channelGroupId, merchantOrderId) => {
   const sql = `
       UPDATE tg_order
       SET channel_msg_id  = ?,
@@ -392,19 +387,82 @@ const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchan
       WHERE merchant_chat_id = ?
         AND channel_group_id = ?
         AND merchant_order_id = ?
-        AND channel_order_id = ?
   `;
   const values = [
     newChannelMsgId,
     newMerchantMsgId,
     merchantChatId,
     channelGroupId,
-    merchantOrderId,
-    channelOrderId
+    merchantOrderId
   ];
 
   const result = await queryAsync(sql, values);
   return result.affectedRows;
+};
+
+/**
+ * 查询“未处理”的订单
+ * @returns {Promise<unknown>}
+ */
+const getPendingOrders = async () => {
+  const sql = `SELECT *
+               FROM tg_order
+               WHERE status = 0
+               ORDER BY id ASC LIMIT 20`;
+  const results = await queryAsync(sql);
+  return results;
+};
+
+/**
+ * 检验用户状态，并修改用户状态
+ * @param merchantOrderId
+ * @returns {Promise<void>}
+ */
+const checkAndProcessOrder = async (merchantOrderId) => {
+
+  const selectSql = `SELECT id, status
+                     FROM tg_order
+                     WHERE merchant_order_id = ? LIMIT 1`;
+  const orders = await queryAsync(selectSql, [merchantOrderId]);
+
+  if (!orders || orders.length === 0) {
+    return { found: false };
+  }
+
+  const order = orders[0];
+  if (order.status !== 0) {
+    return { found: true, alreadyProcessed: true };
+  }
+
+  // 2. 更新状态
+  const updateSql = `UPDATE tg_order
+                     SET status = 1
+                     WHERE id = ?`;
+  const result = await queryAsync(updateSql, [order.id]);
+
+  if (result.affectedRows > 0) {
+    return { found: true, updated: true };
+  } else {
+    return { found: true, updated: false };
+  }
+};
+/**
+ * 根据 status 查找账户信息
+ */
+const getAccountByIsRunning = async (isRunning) => {
+  const sql = `SELECT id
+               FROM tg_accounts
+               WHERE is_running = ?`;
+  return await queryAsync(sql, [isRunning]);
+};
+
+/**
+ * 根据ID和status为0查找数据
+ */
+const isAccountExistsWithStatus = async (id, accStatus) => {
+  const sql = `SELECT 1 FROM tg_accounts WHERE id = ? AND status = ? LIMIT 1`;
+  const result = await queryAsync(sql, [id, accStatus]);
+  return result.length > 0;
 };
 
 
@@ -434,5 +492,9 @@ module.exports = {
   getOrderByChannelMsgId,
   updateOrderStatusByChannelMsgId,
   getOrderByMeChMoCo,
-  updateMsgIdsByOrderKey
+  updateMsgIdsByOrderKey,
+  getPendingOrders,
+  checkAndProcessOrder,
+  getAccountByIsRunning,
+  isAccountExistsWithStatus
 };
