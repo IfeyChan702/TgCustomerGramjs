@@ -1,15 +1,15 @@
-const { stopListener, startListener } = require('./tgListenerService');
-const db = require('../models/mysqlModel');
+const { stopListener, startListener } = require("./tgListenerService");
+const db = require("../models/mysqlModel");
 
 
 // 查询所有账户，支持关键词模糊搜索（模糊匹配 registerId、phone、status）
-exports.getAllAccounts = (keyword = '') => {
+exports.getAllAccounts = (keyword = "") => {
   return new Promise((resolve, reject) => {
-    let sql = 'SELECT * FROM tg_accounts';
+    let sql = "SELECT * FROM tg_accounts";
     const values = [];
 
     if (keyword) {
-      sql += ' WHERE registerId LIKE ? OR phone LIKE ? OR api_id LIKE ?';
+      sql += " WHERE registerId LIKE ? OR phone LIKE ? OR api_id LIKE ?";
       const like = `%${keyword}%`;
       values.push(like, like, like);
     }
@@ -25,9 +25,9 @@ exports.getAllAccounts = (keyword = '') => {
 exports.createAccount = (account) => {
   return new Promise((resolve, reject) => {
     const sql = `
-      INSERT INTO tg_accounts 
+        INSERT INTO tg_accounts
         (registerId, Id, api_id, api_hash, session, is_running, created_at, code, phone, status, telegram_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const values = [
       account.registerId,
@@ -54,9 +54,9 @@ exports.createAccount = (account) => {
 exports.updateAccount = async (registerId, account) => {
   return new Promise((resolve, reject) => {
     const sql = `
-      UPDATE tg_accounts 
-      SET is_running = ?
-      WHERE registerId = ?
+        UPDATE tg_accounts
+        SET is_running = ?
+        WHERE registerId = ?
     `;
     const values = [account.is_running, registerId];
 
@@ -73,7 +73,9 @@ exports.updateAccount = async (registerId, account) => {
         } else if (Number(account.is_running) === 1) {
           // 获取完整数据以重启监听
           db.query(
-            `SELECT api_id, api_hash, session FROM tg_accounts WHERE registerId = ?`,
+            `SELECT api_id, api_hash, session
+             FROM tg_accounts
+             WHERE registerId = ?`,
             [registerId],
             async (fetchErr, rows) => {
               if (fetchErr) return reject(fetchErr);
@@ -103,11 +105,31 @@ exports.updateAccount = async (registerId, account) => {
 // 删除账户
 exports.deleteAccount = (registerId) => {
   return new Promise((resolve, reject) => {
-    const sql = 'DELETE FROM tg_accounts WHERE registerId = ?';
+    const sql = "DELETE FROM tg_accounts WHERE registerId = ?";
     db.query(sql, [registerId], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
   });
 };
-
+/**
+ * 根据id修改isRunning
+ * @param accId
+ * @param isRunning
+ * @returns {Promise<void>}
+ */
+exports.updateRunningByAccId = async (accId, isRunning) => {
+  const sql = ` UPDATE tg_accounts
+                SET is_running = ?
+                WHERE Id = ?`;
+  try {
+    const result = await db.query(sql, [isRunning, accId]);
+    if (result.affectedRows === 0) {
+      console.log(`[WARNING] No account found with Id = ${accId}`);
+    }
+    return result;
+  } catch (err) {
+    console.error("Failed to update is_running:", err);
+    throw err;
+  }
+};

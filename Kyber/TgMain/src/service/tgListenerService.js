@@ -1,15 +1,11 @@
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
-const { Api } = require("telegram");
-const { Markup } = require("telegram");
-const { startRedis, redis } = require("../models/redisModel");
 const axios = require("axios");
 const tgDbService = require("./tgDbService");
-const { getOrderByChannelMsgId } = require("./tgDbService");
-const { off } = require("process");
-const { call } = require("express");
-const { withRedisLock } = require("../utils/lockUtil");
+const { withRedisLock, getOrRunMessageResponse } = require("../utils/lockUtil");
+const { redis } = require("../models/redisModel");
+const { updateRunningByAccId } = require("./tgAccountService");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
@@ -76,14 +72,13 @@ async function handleEvent(client, event) {
     //orderChatId
     if (chatId === ErrorGroupChatID) {
       if (message.message === "/未处理") {
-        await withRedisLock(redis, `lock:noproc:${chatId},${message.id}`, 10, async () => {
+        await getOrRunMessageResponse(redis,chatId,message.id, 60*10, async () => {
           await handleNoProOrder(client, chatId, message,senderTelegramID);
         });
         return;
       }
-
       if (message.message.startsWith("/已处理:")) {
-        await withRedisLock(redis, `lock:proc:${chatId}`, 10, async () => {
+        await getOrRunMessageResponse(redis,chatId,message.id, 60*10, async () => {
           await handleProOrder(client, chatId, message);
         });
         return;
@@ -92,17 +87,24 @@ async function handleEvent(client, event) {
       //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
       if (!isAuthorized(sender)) {
         if (message.message === "/start") {
-          await handleStartOrder(client, chatId);
+          await getOrRunMessageResponse(redis,chatId,message.id,60*10,async () => {
+            await handleStartOrder(client, chatId);
+          });
           return;
         }
 
+
         if (message.message.startsWith("/start_")) {
-          await handleStartOrderByID(client, chatId, message);
+          await getOrRunMessageResponse(redis,chatId,message.id,60*10,async () => {
+            await handleStartOrderByID(client, chatId, message);
+          })
           return;
         }
 
         if ("/stop") {
-          await handleStopOrder();
+          await getOrRunMessageResponse(redis,chatId,message.id,60*10,async () => {
+            await handleStopOrder();
+          })
           return;
         }
       }
@@ -442,7 +444,7 @@ async function handleStartOrder(client, chatId) {
 }
 
 /**
- *
+ * 处理"/start_"+id的命令
  * @param client
  * @param chatId
  * @param message
@@ -450,19 +452,26 @@ async function handleStartOrder(client, chatId) {
  */
 async function handleStartOrderByID(client, chatId, message) {
   try {
+    const parts = message.message?.split("_")
+    if (!parts || parts.length < 2){
+      return client.SendMessage(chatId,{
+        message:`开启用户指令错误,"/start_"+用户id`
+      });
+    }
     const accId = message.message.split("_")[1].trim();
     if (await tgDbService.isAccountExistsWithStatus(accId, 0)) {
-      //TODO 这里可能需要再修改用户状态
+      await updateRunningByAccId(accId,1);
       await startListener(accId);
       client.SendMessage(chatId, {
         message: `开启成功，用户${accId}成功开启`
       });
+      return;
     }
     client.SendMessage(chatId, {
       message: `开启失败，用户${accId}已经是开启状态`
     });
   } catch (e) {
-    console.log();
+    console.log(`[ERROR] 开启用户失败`);
   }
 }
 
