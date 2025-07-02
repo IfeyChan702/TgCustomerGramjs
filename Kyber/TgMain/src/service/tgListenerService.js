@@ -3,9 +3,8 @@ const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 const axios = require("axios");
 const tgDbService = require("./tgDbService");
-const { withRedisLock, getOrRunMessageResponse } = require("../utils/lockUtil");
+const { getOrRunMessageResponse } = require("../utils/lockUtil");
 const { redis } = require("../models/redisModel");
-const { updateRunningByAccId } = require("./tgAccountService");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
@@ -72,13 +71,13 @@ async function handleEvent(client, event) {
     //orderChatId
     if (chatId === ErrorGroupChatID) {
       if (message.message === "/未处理") {
-        await getOrRunMessageResponse(redis,chatId,message.id, 60*10, async () => {
-          await handleNoProOrder(client, chatId, message,senderTelegramID);
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleNoProOrder(client, chatId, message, senderTelegramID);
         });
         return;
       }
       if (message.message.startsWith("/已处理:")) {
-        await getOrRunMessageResponse(redis,chatId,message.id, 60*10, async () => {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleProOrder(client, chatId, message);
         });
         return;
@@ -87,24 +86,31 @@ async function handleEvent(client, event) {
       //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
       if (!isAuthorized(sender)) {
         if (message.message === "/start") {
-          await getOrRunMessageResponse(redis,chatId,message.id,60*10,async () => {
-            await handleStartOrder(client, chatId);
+          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+            await handleStartOrStopOrder(client, chatId, true, 0);
           });
           return;
         }
 
 
         if (message.message.startsWith("/start_")) {
-          await getOrRunMessageResponse(redis,chatId,message.id,60*10,async () => {
+          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
             await handleStartOrderByID(client, chatId, message);
-          })
+          });
           return;
         }
 
-        if ("/stop") {
-          await getOrRunMessageResponse(redis,chatId,message.id,60*10,async () => {
-            await handleStopOrder();
-          })
+        if (message.message === "/stop") {
+          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+            await handleStartOrStopOrder(client, chatId, false, 1);
+          });
+          return;
+        }
+
+        if (message.message.startsWith("/stop_")) {
+          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+            await handleStopOrderByID(client,chatId,message);
+          });
           return;
         }
       }
@@ -353,7 +359,7 @@ async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, cha
  * @param message
  * @returns {Promise<void>}
  */
-async function handleNoProOrder(client, chatId, message,telegramId) {
+async function handleNoProOrder(client, chatId, message, telegramId) {
 
   const orders = await tgDbService.getPendingOrders();
 
@@ -424,23 +430,43 @@ async function handleProOrder(client, chatId, text) {
  * 处理"/start"命令
  * @returns {Promise<void>}
  */
-async function handleStartOrder(client, chatId) {
-  //这里有问题
-  const availableAcc = await tgDbService.getAccountByIsRunning(0);
-  if (!availableAcc || availableAcc.length === 0) {
-    await client.sendMessage(chatId, {
-      message: "⚠️ 账号都已经开启！"
+async function handleStartOrStopOrder(client, chatId, isStart, isRunning) {
+  try {
+    const availableAcc = await tgDbService.getAccountByIsRunning(isRunning);
+
+    if (!availableAcc || availableAcc.length === 0) {
+      //TODO 这里有一个问题如果是全部的的账户都关闭了，就无法发送消息
+      if (!isStart){
+        return;
+      }
+      const message = isStart
+        ? "⚠️ 所有账号都已经开启！"
+        : "⚠️ 所有账号都已经关闭！";
+      return client.sendMessage(chatId, {
+        message: message
+      });
+    }
+
+    const actionText = isStart ? "未开启" : "已开启";
+    const commandPrefix = isStart ? "start_" : "stop_";
+
+    let msg = `${actionText}的用户列表：\n\n`;
+    availableAcc.forEach((acc, idx) => {
+      msg += `${idx + 1}. 用户ID：${acc.id}\n`;
     });
-    return;
+
+    msg += `\n💡 请输入 "${commandPrefix}"+用户ID 来${isStart ? "开启" : "关闭"}该用户`;
+
+    await client.sendMessage(chatId, {
+      message: msg
+    });
+
+  } catch (err) {
+    console.error(`[ERROR] 处理 ${isStart ? "开启" : "关闭"}用户列表失败:`, err);
+    await client.sendMessage(chatId, {
+      message: `系统错误，无法获取账号列表。`
+    });
   }
-  let msg = "未开启的用户列表：\n\n";
-  availableAcc.forEach((acc, idx) => {
-    msg += `${idx + 1}.用户ID：${acc.id}\n`;
-  });
-  msg += `\n请输入"start_"+用户ID，就可以开启用户`;
-  client.sendMessage(chatId, {
-    message: msg
-  });
 }
 
 /**
@@ -452,15 +478,15 @@ async function handleStartOrder(client, chatId) {
  */
 async function handleStartOrderByID(client, chatId, message) {
   try {
-    const parts = message.message?.split("_")
-    if (!parts || parts.length < 2){
-      return client.SendMessage(chatId,{
-        message:`开启用户指令错误,"/start_"+用户id`
+    const parts = message.message?.split("_");
+    if (!parts || parts.length < 2) {
+      return client.SendMessage(chatId, {
+        message: `开启用户指令错误,"/start_"+用户id`
       });
     }
     const accId = message.message.split("_")[1].trim();
     if (await tgDbService.isAccountExistsWithStatus(accId, 0)) {
-      await updateRunningByAccId(accId,1);
+      await tgDbService.updateRunningByAccId(accId, 1);
       await startListener(accId);
       client.SendMessage(chatId, {
         message: `开启成功，用户${accId}成功开启`
@@ -476,40 +502,20 @@ async function handleStartOrderByID(client, chatId, message) {
 }
 
 /**
- * 处理"/stop"命令
+ * 处理"/stop_"+id的命令
+ * @param client
+ * @param chatId
+ * @param message
  * @returns {Promise<void>}
  */
-async function handleStopOrder() {
-
-}
-
-//
-async function showConnectedTelegramUsers(client, chatId) {
-  if (!clients || clients.length === 0) {
-    await client.sendMessage(chatId, {
-      message: "⚠️ 当前没有任何连接中的账号。"
+async function handleStopOrderByID(client, chatId, message) {
+  const parts = message.message?.split("_");
+  if (!parts || parts.length < 2) {
+    return client.SendMessage(chatId, {
+      message: `开启用户指令错误,"/stop_"+用户id`
     });
-    return;
   }
 
-  let text = "📡 当前连接中的 Telegram 用户列表：\n\n";
-
-  for (const entry of clients) {
-    try {
-      const user = await entry.client.getMe();
-      text += `🟢 ID: ${user.id}\n`;
-      text += `👤 名称: ${user.firstName ?? ""} ${user.lastName ?? ""}\n`;
-      text += `📛 用户名: @${user.username ?? "（无）"}\n`;
-      text += `🆔 本地标识: ${entry.id}\n`;
-      text += `──────────────\n`;
-    } catch (err) {
-      text += `⚠️ 无法获取账号 ID ${entry.id} 的信息（连接异常）\n──────────────\n`;
-    }
-  }
-
-  await client.sendMessage(chatId, {
-    message: text.trim()
-  });
 }
 
 

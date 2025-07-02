@@ -465,6 +465,28 @@ const isAccountExistsWithStatus = async (id, accStatus) => {
   return result.length > 0;
 };
 
+/**
+ * 根据id修改isRunning
+ * @param accId
+ * @param isRunning
+ * @returns {Promise<void>}
+ */
+const updateRunningByAccId = async (accId, isRunning) => {
+  const sql = ` UPDATE tg_accounts
+                SET is_running = ?
+                WHERE Id = ?`;
+  try {
+    const result = await db.query(sql, [isRunning, accId]);
+    if (result.affectedRows === 0) {
+      console.log(`[WARNING] No account found with Id = ${accId}`);
+    }
+    return result;
+  } catch (err) {
+    console.error("Failed to update is_running:", err);
+    throw err;
+  }
+};
+
 
 // 统一导出
 module.exports = {
@@ -496,5 +518,6 @@ module.exports = {
   getPendingOrders,
   checkAndProcessOrder,
   getAccountByIsRunning,
-  isAccountExistsWithStatus
+  isAccountExistsWithStatus,
+  updateRunningByAccId
 };
