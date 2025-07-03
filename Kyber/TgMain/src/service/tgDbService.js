@@ -416,7 +416,7 @@ const getPendingOrders = async () => {
 /**
  * 检验用户状态，并修改用户状态
  * @param merchantOrderId
- * @returns {Promise<void>}
+ * @returns {Promise<{found: boolean}>}
  */
 const checkAndProcessOrder = async (merchantOrderId) => {
 

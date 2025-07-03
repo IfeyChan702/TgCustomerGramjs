@@ -8,7 +8,7 @@ const { redis } = require("../models/redisModel");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
-const orderOrderId = -4856325360;//线上的命令群
+const orderChatId = -4856325360;//线上的命令群
 const ADMIN_USER_IDS = ["12345678"];
 
 // 启动所有账户监听
@@ -71,7 +71,7 @@ async function handleEvent(client, event) {
     //0是关闭，1是开启
     //orderChatId
     //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
-    if (chatId === orderOrderId) {
+    if (chatId === orderChatId) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleNoProOrder(client, chatId, message, senderTelegramID);
@@ -383,6 +383,8 @@ async function handleNoProOrder(client, chatId, message, telegramId) {
     text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
   });
 
+  text += `\n 使用命令"/已处理:"+订单号，可以完成订单处理`;
+
   await client.sendMessage(chatId, {
     message: text,
     replyTo: message.id
@@ -393,17 +395,17 @@ async function handleNoProOrder(client, chatId, message, telegramId) {
  * 处理"订单已完成"
  * @param client
  * @param chatId
- * @param text
+ * @param message
  * @returns {Promise<void>}
  */
-async function handleProOrder(client, chatId, text) {
-  const parts = text.split(":");
+async function handleProOrder(client, chatId, message) {
+  const parts = message.message.split(":");
   const orderId = parts[1]?.trim();
 
   if (!orderId) {
     await client.sendMessage(chatId, {
       message: "❌ 订单号格式错误，请使用 /已处理:订单号",
-      replyTo: replyToMessageId
+      replyTo: message.id
     });
     return;
   }
@@ -413,22 +415,22 @@ async function handleProOrder(client, chatId, text) {
   if (!result.found) {
     await client.sendMessage(chatId, {
       message: `⚠️ 未找到订单号 ${orderId}，请确认是否正确。`,
-      replyTo: replyToMessageId
+      replyTo: message.id
     });
   } else if (result.alreadyProcessed) {
     await client.sendMessage(chatId, {
       message: `✅ 订单 ${orderId} 已经处理过了，无需重复操作。`,
-      replyTo: replyToMessageId
+      replyTo: message.id
     });
   } else if (result.updated) {
     await client.sendMessage(chatId, {
       message: `✅ 订单 ${orderId} 已成功标记为已处理！`,
-      replyTo: replyToMessageId
+      replyTo: message.id
     });
   } else {
     await client.sendMessage(chatId, {
       message: `❗ 订单 ${orderId} 标记失败，请稍后重试。`,
-      replyTo: replyToMessageId
+      replyTo: message.id
     });
   }
 }
@@ -583,7 +585,7 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
         - 名称: ${chatTitle || "（无标题）"}`;
 
     await client.sendMessage(chatId, {
-      message: text,
+      message: text
     });
   } catch (e) {
     console.error(`[ERROR] 处理命令"/chatId"故障:`, e);
