@@ -101,13 +101,13 @@ exports.insertOrder = (order) => {
     `;
 
     const values = [
-      order.channel_msg_id ?? null,
-      order.merchant_msg_id ?? null,
-      order.merchant_chat_id,
-      order.channel_group_id,
-      0, // 默认 status 为 0（未处理）
-      order.merchant_order_id ?? null,
-      order.tg_reply_id ?? null
+      order.channelMsgId ?? null,
+      order.merchantMsgId ?? null,
+      order.merchantChatId,
+      order.channelGroupId,
+      order.orderstatus, // 默认 status 为 0（未处理）
+      order.merchantOrderId,
+      order.tgReplyId ?? null
     ];
 
     db.query(sql, values, (err, result) => {
@@ -132,16 +132,6 @@ exports.deleteOrderById = (id) => {
       if (err) return reject(err);
       resolve(result);
     });
-  });
-};
-/**
- * 修改订单
- * @param order
- * @returns {Promise<unknown>}
- */
-exports.updateOrder = (order) => {
-  return new Promise((resolve, reject) => {
-
   });
 };
 

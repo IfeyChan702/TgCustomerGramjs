@@ -71,7 +71,7 @@ async function handleEvent(client, event) {
     //0是关闭，1是开启
     //orderChatId
     //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
-    if (chatId === orderOrderId) {
+    if (chatId === ErrorGroupChatID) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleNoProOrder(client, chatId, message, senderTelegramID);
