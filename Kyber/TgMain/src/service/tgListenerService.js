@@ -8,6 +8,7 @@ const { redis } = require("../models/redisModel");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
+const orderOrderId = -4856325360;//线上的命令群
 const ADMIN_USER_IDS = ["12345678"];
 
 // 启动所有账户监听
@@ -70,7 +71,7 @@ async function handleEvent(client, event) {
     //0是关闭，1是开启
     //orderChatId
     //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
-    if (chatId === ErrorGroupChatID) {
+    if (chatId === orderOrderId) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleNoProOrder(client, chatId, message, senderTelegramID);
