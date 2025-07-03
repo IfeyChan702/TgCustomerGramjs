@@ -1,20 +1,29 @@
 
-async function withRedisLock(redis,key,ttlSeconds,fn){
-  const value = `${Date.now()}-${Math.random()}`;
-  const lock = await redis.set(key,value,"NX","EX",ttlSeconds);
+async function getOrRunMessageResponse(redis,chatId,messageId,ttlSeconds=600,fn){
+  const resultKey = `msg:result:${chatId}:${messageId}`;
+  const lockKey = `msg:lok:${chatId}:${messageId}`
 
-  if (!lock) return;
+  const cached = await redis.get(resultKey);
+  if (cached){
+    return false;
+  }
 
+  const lock = await redis.set(lockKey,"1","NX","EX",15);
+  if (!lock){
+    return false;
+  }
+
+  let result='';
   try {
     await fn();
-    return true;
-  }finally {
-    const currentValue =await redis.get(key);
-    if (currentValue === value){
-      await redis.del(key);
-    }
+    await redis.set(resultKey,"1","EX",ttlSeconds);
+    return  true;
+  }catch (e){
+    console.error("[handle error]",e);
+    return  false;
   }
+
 }
 
 
-module.exports = { withRedisLock }
+module.exports = { getOrRunMessageResponse }
