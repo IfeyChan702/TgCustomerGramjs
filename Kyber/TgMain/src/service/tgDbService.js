@@ -457,13 +457,36 @@ const getAccountByIsRunning = async (isRunning) => {
 };
 
 /**
- * 根据ID和status为0查找数据
+ * 根据ID和status查找数据
  */
 const isAccountExistsWithStatus = async (id, accStatus) => {
   const sql = `SELECT 1 FROM tg_accounts WHERE id = ? AND status = ? LIMIT 1`;
   const result = await queryAsync(sql, [id, accStatus]);
   return result.length > 0;
 };
+
+/**
+ * 根据id修改isRunning
+ * @param accId
+ * @param isRunning
+ * @returns {Promise<void>}
+ */
+const updateRunningByAccId = async (accId, isRunning) => {
+  const sql = ` UPDATE tg_accounts
+                SET is_running = ?
+                WHERE Id = ?`;
+  try {
+    const result = await db.query(sql, [isRunning, accId]);
+    if (result.affectedRows === 0) {
+      console.log(`[WARNING] No account found with Id = ${accId}`);
+    }
+    return result;
+  } catch (err) {
+    console.error("Failed to update is_running:", err);
+    throw err;
+  }
+};
+
 
 
 // 统一导出
@@ -496,5 +519,6 @@ module.exports = {
   getPendingOrders,
   checkAndProcessOrder,
   getAccountByIsRunning,
-  isAccountExistsWithStatus
+  isAccountExistsWithStatus,
+  updateRunningByAccId
 };
