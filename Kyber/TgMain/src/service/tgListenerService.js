@@ -73,7 +73,7 @@ async function handleEvent(client, event) {
     if (chatId === orderChatId) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleNoProOrder(client, chatId, message, senderTelegramID);
+          await handleNoProOrder(client, chatId, message);
         });
         return;
       }
