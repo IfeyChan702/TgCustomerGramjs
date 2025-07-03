@@ -383,6 +383,8 @@ async function handleNoProOrder(client, chatId, message, telegramId) {
     text += `${index + 1}. 订单号：${order.merchant_order_id} \n`;
   });
 
+  text += `\n 使用命令"/已处理:"+订单号，可以完成订单处理`;
+
   await client.sendMessage(chatId, {
     message: text,
     replyTo: message.id
@@ -583,7 +585,7 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
         - 名称: ${chatTitle || "（无标题）"}`;
 
     await client.sendMessage(chatId, {
-      message: text,
+      message: text
     });
   } catch (e) {
     console.error(`[ERROR] 处理命令"/chatId"故障:`, e);
