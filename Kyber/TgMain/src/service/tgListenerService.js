@@ -63,6 +63,7 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
+  const data = event.data?.toString();
 
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
@@ -73,7 +74,7 @@ async function handleEvent(client, event) {
     if (chatId === orderChatId) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleNoProOrder(client, chatId, message);
+          await handleNoProOrder(client, chatId, message, senderTelegramID);
         });
         return;
       }
@@ -231,8 +232,8 @@ async function handleMerchantOrderMessage(client, chatId, message) {
     const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
 
     if (!targetChatIds.length) {
-      await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
-      const errorSentMsg = await client.sendFile(ErrorGroupChatID, {
+      await client.sendMessage(orderChatId, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
+      const errorSentMsg = await client.sendFile(orderId, {
         file: message.media,
         caption: `${merchantOrderId}`
       });
@@ -275,7 +276,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     let replyId = null;
 
     if (replyText === null) {
-      await client.sendMessage(ErrorGroupChatID, {
+      await client.sendMessage(orderChatId, {
         message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`
       });
       console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
