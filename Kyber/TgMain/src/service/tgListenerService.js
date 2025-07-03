@@ -69,6 +69,7 @@ async function handleEvent(client, event) {
   ) {
     //0是关闭，1是开启
     //orderChatId
+    //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
     if (chatId === ErrorGroupChatID) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
@@ -109,12 +110,17 @@ async function handleEvent(client, event) {
 
         if (message.message.startsWith("/stop_")) {
           await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStopOrderByID(client,chatId,message);
+            await handleStopOrderByID(client, chatId, message);
           });
           return;
         }
       }
-
+      if (message.message === "/chatId") {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleChatIdOrder(client, chatId, message, chatTitle, chat);
+        });
+        return;
+      }
     }
 
   }
@@ -436,7 +442,7 @@ async function handleStartOrStopOrder(client, chatId, isStart, isRunning) {
 
     if (!availableAcc || availableAcc.length === 0) {
       //TODO 这里有一个问题如果是全部的的账户都关闭了，就无法发送消息
-      if (!isStart){
+      if (!isStart) {
         return;
       }
       const message = isStart
@@ -544,6 +550,44 @@ async function handleStopOrderByID(client, chatId, message) {
     console.error(`[ERROR] 关闭用户失败:`, e);
     return client.SendMessage(chatId, {
       message: `系统错误，关闭用户失败：${e.message || e}`
+    });
+  }
+}
+
+/**
+ * 处理"/chatId"的命令
+ * @param client
+ * @param chatId
+ * @param message
+ * @param chatTitle
+ * @param chat
+ * @returns {Promise<void>}
+ */
+async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
+  try {
+    let type = "未知类型";
+    let chatClassName = chat.className;
+    if (chatClassName === "User") {
+      type = "私聊";
+    } else if (chatClassName === "Channel") {
+      type = chat.megagroup ? "超级群组" : (chat.broadcast ? "频道" : "普通频道");
+    } else if (chatClassName === "Chat") {
+      type = "普通群组";
+    }
+
+    const chatIdDis = typeof chatId === "object" ? JSON.stringify(chatId) : chatId.toString();
+    const text = `📨 当前聊天信息：
+        - chatId: ${chatIdDis}
+        - 类型: ${type}
+        - 名称: ${chatTitle || "（无标题）"}`;
+
+    await client.sendMessage(chatId, {
+      message: text,
+    });
+  } catch (e) {
+    console.error(`[ERROR] 处理命令"/chatId"故障:`, e);
+    return client.SendMessage(chatId, {
+      message: `系统错误，"/chatId"命令处理失败`
     });
   }
 }
