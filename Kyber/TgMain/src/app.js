@@ -6,6 +6,7 @@ const replyRoutes = require('./routes/tgReplyRoutes');
 const merchantRoutes = require('./routes/tgMerchantRoute');
 const accountRoutes = require('./routes/tgAccountRoute');
 const channelRoutes = require('./routes/tgChannelRoute');
+const orderRoutes = require('./routes/tgOrderRoutes');
 require('./models/mysqlModel');
 
 
@@ -22,6 +23,7 @@ app.use('/api', replyRoutes);
 app.use('/api', merchantRoutes);
 app.use('/api', accountRoutes);
 app.use('/api', channelRoutes);
+app.use('/api', orderRoutes);
 
 module.exports = app;
 

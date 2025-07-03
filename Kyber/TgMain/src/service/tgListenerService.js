@@ -63,7 +63,6 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
-  const data = event.data?.toString();
 
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
@@ -355,7 +354,6 @@ async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, cha
     }
   } catch (err) {
     console.error(" 插入 tg_order 失敗:", err.message);
-    return;
   }
 }
 
@@ -366,7 +364,7 @@ async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, cha
  * @param message
  * @returns {Promise<void>}
  */
-async function handleNoProOrder(client, chatId, message, telegramId) {
+async function handleNoProOrder(client, chatId, message) {
 
   const orders = await tgDbService.getPendingOrders();
 
