@@ -63,7 +63,7 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
-  const data = event.data?.toString();
+  const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
 
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
@@ -152,7 +152,8 @@ async function handleEvent(client, event) {
   if (
     message.media?.className === "MessageMediaPhoto" &&
     typeof message.message === "string" &&
-    message.message.trim().length > 0
+    message.message.trim().length > 0 &&
+    orderRegex.test(message.message)
   ) {
     await handleMerchantOrderMessage(client, chatId, message);
     return;
