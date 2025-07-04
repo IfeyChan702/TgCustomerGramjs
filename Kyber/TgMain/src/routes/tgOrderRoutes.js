@@ -6,7 +6,7 @@ const tgDbService = require("../service/tgDbService");
 /**
  * 模糊查询、条件查询，分页查询--订单数据
  */
-router.get("/tg-order", async (req, res) => {
+router.get("/tg/order", async (req, res) => {
   try {
     const {
       keyword = "",
@@ -16,7 +16,8 @@ router.get("/tg-order", async (req, res) => {
       merchantId = null,
       channelId = null,
       startTime = null,
-      endTime = null
+      endTime = null,
+      merchantOrderId = null
     } = req.query;
 
     const params = {
@@ -26,6 +27,7 @@ router.get("/tg-order", async (req, res) => {
       status: status !== null ? Number(status) : null,
       merchantId: merchantId ? Number(merchantId) : null,
       channelId: channelId ? Number(channelId) : null,
+      merchantOrderId,
       startTime,
       endTime
     };
@@ -40,16 +42,16 @@ router.get("/tg-order", async (req, res) => {
 /**
  * 插入订单数据
  */
-router.post("/tg-order", async (req, res) => {
+router.post("/tg/order", async (req, res) => {
   try {
     const {
       channelMsgId = null,
       merchantMsgId = null,
       merchantChatId,
       channelGroupId,
-      orderstatus,
+      orderStatus = 0,
       merchantOrderId = null,
-      tgReplyId = null
+      tgReplyId = 0
     } = req.body;
 
     //参数校验
@@ -57,15 +59,11 @@ router.post("/tg-order", async (req, res) => {
       return res.json(fail("merchantOrderId为必填字段"));
     }
 
-    if (!merchantChatId || !channelGroupId) {
-      return res.json(fail("merchantChatId和channelGroupId为必填字段"));
-    }
-
     const insertId = await tgOrderService.insertOrder({
       channelMsgId,
       merchantMsgId,
       merchantChatId,
-      orderstatus,
+      orderStatus,
       channelGroupId,
       merchantOrderId,
       tgReplyId
@@ -80,9 +78,9 @@ router.post("/tg-order", async (req, res) => {
 /**
  * 根据id删除订单
  */
-router.delete("/tg-order", async (req, res) => {
+router.delete("/tg/order/:id", async (req, res) => {
   try {
-    const { id } = req.body;
+    const { id } = req.params;
 
     if (!id) {
       return res.json(fail("订单 id 为空"));
@@ -103,7 +101,7 @@ router.delete("/tg-order", async (req, res) => {
 /**
  * 根据id修改用户的信息
  */
-router.post("/tg-order", async (req, res) => {
+router.patch("/tg/order", async (req, res) => {
 
   const { merchantOrderId } = req.body;
   if (!merchantOrderId) {
