@@ -68,12 +68,11 @@ exports.getVerDonByProId = async (projectId) => {
  * @param params
  * @returns {Promise<void>}
  */
-exports.searchProjectData = async (params) => {
+exports.getProjectData = async (params) => {
   const {
     projectId = null,
     keyword = null,
     code = null,
-    value = null,
     page = 1,
     size = 10
   } = params;
@@ -83,5 +82,60 @@ exports.searchProjectData = async (params) => {
   const countValues = [];
 
   let baseSQL = `
-  `
+    FROM dict_data dd
+    LEFT JOIN dict_type dt ON dd.type_code = dt.code
+    LEFT JOIN dict_projects dp ON dt.project_id = dp.id
+    WHERE 1 = 1
+  `;
+  if (projectId !== null) {
+    baseSQL += ` AND dp.id = ?`;
+    values.push(projectId);
+    countValues.push(projectId);
+  }
+
+  if (code !== null) {
+    baseSQL += ` AND dd.code = ?`;
+    values.push(code);
+    countValues.push(code);
+  }
+
+  if (keyword) {
+    baseSQL += ` AND(
+      dp.name LIKE ? OR
+      dd.code LIKE ? OR
+      dd.value LIKE ? 
+    )`;
+
+    const kw = `%${keyword}%`;
+    values.push(kw, kw, kw);
+    countValues.push(kw, kw, kw);
+  }
+
+  const countSQL = `SELECT COUNT(*) AS total` + baseSQL;
+  const dataSQL = `
+    SELECT dd.id, dd.code, dd.value,
+           dt.code AS type_code,
+           dp.id AS project_id, dp.name AS project_name
+    ` + baseSQL + `
+    ORDER BY dd.id DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  values.push(size, offset);
+
+  return new Promise((resolve, reject) => {
+    db.query(countSQL, countValues, (err, countResult) => {
+      if (err) return reject(err);
+
+      db.query(dataSQL, values, (err, dataResult) => {
+        if (err) return reject(err);
+
+        resolve({
+          total:countResult[0].total,
+          list: dataResult
+        })
+      });
+    });
+  });
+
 };

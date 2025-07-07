@@ -45,12 +45,14 @@ router.get("/project/version/url", async (req, res) => {
   }
 });
 
+/**
+ * 查询项目数据：支持分页、模糊、条件查询project数据
+ */
 router.get("/project/search", async (req, res) => {
   const {
     projectId = null,
     keyword = null,
     code = null,
-    value = null,
     page = 1,
     size = 10
   } = req.query;
@@ -62,13 +64,15 @@ router.get("/project/search", async (req, res) => {
       page: Number(page),
       size: Number(size)
     };
-    const data = await projectService.searchProjectData(params);
+    const data = await projectService.getProjectData(params);
     res.json(success(data));
   } catch (err) {
     console.error(`[ERROR] 查询项目数据失败:`, err);
-    res.json(fail(err.message));
+    res.json(fail(`后台服务器繁忙，查询数据异常`));
   }
 });
+
+
 
 
 module.exports = router;
