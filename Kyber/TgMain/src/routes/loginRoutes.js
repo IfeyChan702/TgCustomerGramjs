@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-
 // 登录
 router.post('/login/account', authController.login);
 
@@ -13,5 +12,7 @@ router.get('/rule', authController.getRules);
 
 // 登出
 router.post('/login/outLogin', authController.logout);
+
+router.get('/captcha', authController.getCaptcha);
 
 module.exports = router;
