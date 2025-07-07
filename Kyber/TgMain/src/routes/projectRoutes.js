@@ -37,11 +37,36 @@ router.get("/project", async (req, res) => {
 router.get("/project/version/url", async (req, res) => {
   try {
     const data = await projectService.getVerDonByProId(1);
-    res.json(success200(data,null));
+    res.json(success200(data, null));
 
   } catch (err) {
     console.error(`[ERROR] 获取版本和下载链接失败，projectId: 1`, err);
     res.json(fail500("系统繁忙，请稍后再试"));
+  }
+});
+
+router.get("/project/search", async (req, res) => {
+  const {
+    projectId = null,
+    keyword = null,
+    code = null,
+    value = null,
+    page = 1,
+    size = 10
+  } = req.query;
+  try {
+    const params = {
+      projectId: projectId ? Number(projectId) : null,
+      code,
+      keyword,
+      page: Number(page),
+      size: Number(size)
+    };
+    const data = await projectService.searchProjectData(params);
+    res.json(success(data));
+  } catch (err) {
+    console.error(`[ERROR] 查询项目数据失败:`, err);
+    res.json(fail(err.message));
   }
 });
 

@@ -63,3 +63,25 @@ exports.getVerDonByProId = async (projectId) => {
     });
   });
 };
+/**
+ * 条件+模糊+分页查询
+ * @param params
+ * @returns {Promise<void>}
+ */
+exports.searchProjectData = async (params) => {
+  const {
+    projectId = null,
+    keyword = null,
+    code = null,
+    value = null,
+    page = 1,
+    size = 10
+  } = params;
+
+  const offset = (page - 1) * size;
+  const values = [];
+  const countValues = [];
+
+  let baseSQL = `
+  `
+};
