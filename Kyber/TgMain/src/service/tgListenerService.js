@@ -74,7 +74,7 @@ async function handleEvent(client, event) {
     if (chatId === orderChatId) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleNoProOrder(client, chatId, message, senderTelegramID);
+          await handleNoProOrder(client, chatId, message);
         });
         return;
       }
@@ -160,7 +160,7 @@ async function handleEvent(client, event) {
   }
 
   // ----------- 4. 渠道群回复监听，转发回商户群 -----------
-  if (message.replyTo && message.replyTo.replyToMsgId) {
+  if (message.replyTo && message.replyTo.replyToMsgId && orderRegex.test(message.message)) {
     await handleChannelReply(client, chatId, chatTitle, message);
     return;
   }
