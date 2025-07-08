@@ -75,13 +75,13 @@ router.get("/project/search", async (req, res) => {
 /**
  * 插入project的全部数据
  */
-router.post("/project/insert",async (req,res)=>{
+router.post("/project/insert", async (req, res) => {
   let {
     projectName,
     codeTypePre,
     code,
     value
-  } = req.body
+  } = req.body;
   try {
     if (!projectName || projectName.trim() === "") return res.json(fail("projectName不能为空"));
     if (!code) return res.json(fail("code不能为空"));
@@ -92,16 +92,31 @@ router.post("/project/insert",async (req,res)=>{
       codeTypePre = "project";
     }
 
-    if (codeTypePre.includes("_")) return res.json(fail("codeTypePre不能含有“_”"))
+    if (codeTypePre.includes("_")) return res.json(fail("codeTypePre不能含有“_”"));
 
     const codeType = await projectService.generateNextTypeCodeByPrefix(codeTypePre.trim());
 
-    await projectService.insertProjectAll(projectName.trim(),codeType,code,value)
+    await projectService.insertProjectAll(projectName.trim(), codeType, code, value);
 
-    res.json(success("插入成功"))
-  }catch (e){
-    console.error("[ERROR]插入数据失败：",e);
+    res.json(success("插入成功"));
+  } catch (e) {
+    console.error("[ERROR]插入数据失败：", e);
     res.json(fail("系统繁忙，插入数据失败"));
+  }
+});
+
+router.post("/project/update", async (req, res) => {
+
+  const { id, code, value } = req.body;
+
+  try {
+    if (!id) return res.json(fail("id 是必须的"));
+    if (!code && !value) return res.json(fail("code 和 value 不能同时为空"));
+
+    await projectService.updateCoVeById(id, code, value);
+  } catch (err) {
+    console.error("[ERROR] 更新 dict_data 失败：", err);
+    res.json(fail("系统错误，更新失败"));
   }
 });
 

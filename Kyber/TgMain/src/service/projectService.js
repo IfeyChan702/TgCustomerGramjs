@@ -1,6 +1,7 @@
 const util = require("util");
 const db = require("../models/mysqlModel");
 const { rejects } = require("node:assert");
+const { valueOf } = require("jest");
 
 /**
  * 接口：返回key，value
@@ -228,6 +229,36 @@ exports.generateNextTypeCodeByPrefix = async (prefix = "project") => {
         }
       }
       return resolve(`${prefix}_${suffix}`);
+    });
+  });
+};
+/**
+ * 根据id修改code或者value
+ * @param id
+ * @param code
+ * @param value
+ * @return {Promise<void>}
+ */
+exports.updateCoVeById = async (id, code, value) => {
+  return new Promise((resolve, reject) => {
+    let sql = `UPDATE dict_data SET `;
+    const params = [];
+    if (code) {
+      sql += `code = ? `;
+      params.push(code);
+    }
+
+    if (value) {
+      if (code) sql += `, `;
+      sql += `value = ? `;
+      params.push(value);
+    }
+
+    sql += `WHERE id = ?`;
+    params.push(id);
+    db.query(sql, params, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
     });
   });
 };
