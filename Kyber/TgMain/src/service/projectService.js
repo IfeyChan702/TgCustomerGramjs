@@ -262,3 +262,18 @@ exports.updateCoVeById = async (id, code, value) => {
     });
   });
 };
+/**
+ * 根据id删除数据
+ * @param deleteId
+ * @return {Promise<unknown>}
+ */
+exports.deleteById = (deleteId) => {
+  return new Promise((resolve,reject) => {
+    const sql = `DELETE FROM dict_data WHERE id = ?`;
+
+    db.query(sql,[deleteId],(err,result) => {
+      if (err) return reject(err);
+      resolve(result)
+    });
+  });
+};

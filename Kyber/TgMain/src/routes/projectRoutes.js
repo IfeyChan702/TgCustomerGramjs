@@ -105,6 +105,9 @@ router.post("/project/insert", async (req, res) => {
   }
 });
 
+/**
+ * 修改project的数据
+ */
 router.post("/project/update", async (req, res) => {
 
   const { id, code, value } = req.body;
@@ -117,6 +120,29 @@ router.post("/project/update", async (req, res) => {
   } catch (err) {
     console.error("[ERROR] 更新 dict_data 失败：", err);
     res.json(fail("系统错误，更新失败"));
+  }
+});
+
+/**
+ * 根据id删除数据
+ */
+router.delete("/project/delete", async (req, res) => {
+
+  const { id } = req.body;
+
+  try {
+    if (!id) return res.json(fail("id 参数不能为空"));
+
+    const result = await projectService.deleteById(id);
+
+    if (result.affectedRows === 0){
+      return res.json(fail("未找到对应的数据或者已经删除"));
+    }
+
+    res.json(success("删除成功!"))
+  } catch (err) {
+    console.error("[ERROR] 删除 dict_data 失败:", err);
+    res.json(fail("系统繁忙,删除失败"));
   }
 });
 
