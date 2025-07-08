@@ -139,6 +139,7 @@ exports.getProjectData = async (params) => {
     });
   });
 };
+
 /**
  * 插入project三个表的数据
  * @param projectName
@@ -148,55 +149,58 @@ exports.getProjectData = async (params) => {
  * @returns {Promise<void>}
  */
 exports.insertProjectAll = async (projectName, codeType, code, value) => {
-  const conn = await db.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [projectRows] = await conn.query(
-      `SELECT id
-       FROM dict_projects
-       WHERE name = ? LIMIT 1`,
-      [projectName]
-    );
+  return new Promise((resolve, reject) => {
+    db.query(`SELECT id
+              FROM dict_projects
+              WHERE name = ? LIMIT 1`, [projectName], (err, projectRows) => {
 
-    let projectId;
-    if (projectRows.length > 0) {
-      projectId = projectRows[0].id;
-    } else {
-      const [projectResult] = await conn.query(
-        `INSERT INTO dict_projects (name)
-         VALUES (?)`,
-        [projectName]
-      );
-      projectId = projectResult.insertId;
-    }
-    const [typeExist] = await conn.query(
-      `SELECT id
-       FROM dict_type
-       WHERE project_id = ?
-         AND code = ? LIMIT 1`,
-      [projectId, codeType]
-    );
-    if (typeExist.length === 0) {
-      await conn.query(
-        `INSERT INTO dict_type (project_id, code)
-         VALUES (?, ?)`,
-        [projectId, codeType]
-      );
-    }
-    await conn.query(
-      `INSERT INTO dict_data (type_code, code, value)
-       VALUES (?, ?, ?)`,
-      [codeType, code, value]
-    );
+      if (err) return reject(err);
+      let projectId;
 
-    await conn.commit();
-  } catch (e) {
-    await conn.rollback();
-    console.error("[ERROR] 插入项目数据失败:", e);
-    throw e;
-  } finally {
-    conn.release();
-  }
+      const insertTypeAndData = () => {
+        db.query(`SELECT id
+                  FROM dict_type
+                  WHERE project_id = ?
+                    AND code = ?`, [projectId, codeType], (err, typeRows) => {
+          if (err) return reject(err);
+
+          const insertData = () => {
+            db.query(`INSERT INTO dict_data (type_code, code, value)
+                      VALUES (?, ?, ?)`, [codeType, code, value], (err) => {
+              if (err) return reject(err);
+              return resolve("插入成功");
+            });
+          };
+
+          if (typeRows.length > 0) {
+            insertData();
+          } else {
+            db.query(
+              `INSERT INTO dict_type (project_id, code)
+               VALUES (?, ?)`,
+              [projectId, codeType],
+              (err) => {
+                if (err) return reject(err);
+                insertData();
+              }
+            );
+          }
+        });
+      };
+
+      if (projectRows.length > 0) {
+        projectId = projectRows[0].id;
+        insertTypeAndData();
+      } else {
+        db.query(`INSERT INTO dict_projects(name)
+                  VALUES (?)`, [projectName], (err, result) => {
+          if (err) return reject(err);
+          projectId = result.insertId;
+          insertTypeAndData();
+        });
+      }
+    });
+  });
 };
 
 /**
