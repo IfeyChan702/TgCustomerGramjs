@@ -72,7 +72,38 @@ router.get("/project/search", async (req, res) => {
   }
 });
 
+/**
+ * 插入project的全部数据
+ */
+router.post("/project/insert",async (req,res)=>{
+  let {
+    projectName,
+    codeTypePre,
+    code,
+    value
+  } = req.body
+  try {
+    if (!projectName || projectName.trim() === "") return res.json(fail("projectName不能为空"));
+    if (!code) return res.json(fail("code不能为空"));
+    if (!value) return res.json(fail("value不能为空"));
 
+
+    if (!codeTypePre || typeof codeTypePre !== "string" || codeTypePre.trim() === "") {
+      codeTypePre = "project";
+    }
+
+    if (codeTypePre.includes("_")) return res.json(fail("codeTypePre不能含有“_”"))
+
+    const codeType = await projectService.generateNextTypeCodeByPrefix(codeTypePre.trim());
+
+    await projectService.insertProjectAll(projectName.trim(),codeType,code,value)
+
+    res.json(success("插入成功"))
+  }catch (e){
+    console.error("[ERROR]插入数据失败：",e);
+    res.json(fail("系统繁忙，插入数据失败"));
+  }
+});
 
 
 module.exports = router;

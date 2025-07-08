@@ -1,5 +1,6 @@
 const util = require("util");
 const db = require("../models/mysqlModel");
+const { rejects } = require("node:assert");
 
 /**
  * 接口：返回key，value
@@ -131,11 +132,98 @@ exports.getProjectData = async (params) => {
         if (err) return reject(err);
 
         resolve({
-          total:countResult[0].total,
+          total: countResult[0].total,
           list: dataResult
-        })
+        });
       });
     });
   });
+};
+/**
+ * 插入project三个表的数据
+ * @param projectName
+ * @param codeType
+ * @param code
+ * @param value
+ * @returns {Promise<void>}
+ */
+exports.insertProjectAll = async (projectName, codeType, code, value) => {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [projectRows] = await conn.query(
+      `SELECT id
+       FROM dict_projects
+       WHERE name = ? LIMIT 1`,
+      [projectName]
+    );
 
+    let projectId;
+    if (projectRows.length > 0) {
+      projectId = projectRows[0].id;
+    } else {
+      const [projectResult] = await conn.query(
+        `INSERT INTO dict_projects (name)
+         VALUES (?)`,
+        [projectName]
+      );
+      projectId = projectResult.insertId;
+    }
+    const [typeExist] = await conn.query(
+      `SELECT id
+       FROM dict_type
+       WHERE project_id = ?
+         AND code = ? LIMIT 1`,
+      [projectId, codeType]
+    );
+    if (typeExist.length === 0) {
+      await conn.query(
+        `INSERT INTO dict_type (project_id, code)
+         VALUES (?, ?)`,
+        [projectId, codeType]
+      );
+    }
+    await conn.query(
+      `INSERT INTO dict_data (type_code, code, value)
+       VALUES (?, ?, ?)`,
+      [codeType, code, value]
+    );
+
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+    console.error("[ERROR] 插入项目数据失败:", e);
+    throw e;
+  } finally {
+    conn.release();
+  }
+};
+
+/**
+ * 根据前缀生成下一个可用的 type_code
+ * @param prefix
+ * @returns {Promise<string>}
+ */
+exports.generateNextTypeCodeByPrefix = async (prefix = "project") => {
+  const value = `${prefix}_%`;
+  const sql = `
+      SELECT code
+      FROM dict_type
+      WHERE code LIKE ?
+      ORDER BY id DESC LIMIT 1
+  `;
+
+  return new Promise((resolve, reject) => {
+    db.query(sql, [value], (err, result) => {
+      if (err) return reject(err);
+      let suffix = 1;
+      if (result.length > 0) {
+        const match = result[0].code.match(/_(\d+)$/);
+        if (match) {
+          suffix = parseInt(match[1]) + 1;
+        }
+      }
+      return resolve(`${prefix}_${suffix}`);
+    });
+  });
 };
