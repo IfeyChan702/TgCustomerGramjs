@@ -48,7 +48,7 @@ router.get("/project/version/url", async (req, res) => {
 /**
  * 查询项目数据：支持分页、模糊、条件查询project数据
  */
-router.get("/project/search", async (req, res) => {
+router.get("/project/data", async (req, res) => {
   const {
     projectId = null,
     keyword = null,
@@ -75,7 +75,7 @@ router.get("/project/search", async (req, res) => {
 /**
  * 插入project的全部数据
  */
-router.post("/project/insert", async (req, res) => {
+router.post("/project/data", async (req, res) => {
   let {
     projectName,
     codeTypePre,
@@ -108,7 +108,7 @@ router.post("/project/insert", async (req, res) => {
 /**
  * 修改project的数据
  */
-router.post("/project/update", async (req, res) => {
+router.put("/project/data", async (req, res) => {
 
   const { id, code, value } = req.body;
 
@@ -117,6 +117,7 @@ router.post("/project/update", async (req, res) => {
     if (!code && !value) return res.json(fail("code 和 value 不能同时为空"));
 
     await projectService.updateCoVeById(id, code, value);
+    res.json(success("修改成功"))
   } catch (err) {
     console.error("[ERROR] 更新 dict_data 失败：", err);
     res.json(fail("系统错误，更新失败"));
@@ -126,9 +127,9 @@ router.post("/project/update", async (req, res) => {
 /**
  * 根据id删除数据
  */
-router.delete("/project/delete", async (req, res) => {
+router.delete("/project/data/:id", async (req, res) => {
 
-  const { id } = req.body;
+  const { id } = req.params;
 
   try {
     if (!id) return res.json(fail("id 参数不能为空"));
