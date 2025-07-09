@@ -7,8 +7,10 @@ const replyRoutes = require('./routes/tgReplyRoutes');
 const merchantRoutes = require('./routes/tgMerchantRoute');
 const accountRoutes = require('./routes/tgAccountRoute');
 const channelRoutes = require('./routes/tgChannelRoute');
+const orderRoutes = require('./routes/tgOrderRoutes');
+const projectRoutes = require('./routes/projectRoutes');
 require('./models/mysqlModel');
-
+const session = require('express-session');
 
 const app = express();
 app.use(express.json());
@@ -17,6 +19,12 @@ app.use(express.json());
 startRedis();
 
 // 注册路由
+app.use(session({
+  secret: 'my-captcha-secret', // 可以自定义
+  resave: false,
+  saveUninitialized: true,
+  cookie: { maxAge: 5 * 60 * 1000 }, // 5分钟有效
+}));
 app.use('/api', loginRoutes);
 app.use('/api', exportRoutes);
 app.use('/api/tg', tgRoutes);
@@ -24,6 +32,9 @@ app.use('/api', replyRoutes);
 app.use('/api', merchantRoutes);
 app.use('/api', accountRoutes);
 app.use('/api', channelRoutes);
+app.use('/api', orderRoutes);
+app.use('/api', projectRoutes);
+
 
 module.exports = app;
 

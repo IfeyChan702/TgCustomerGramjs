@@ -63,7 +63,7 @@ async function handleEvent(client, event) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
-  const data = event.data?.toString();
+  const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
 
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
@@ -74,7 +74,7 @@ async function handleEvent(client, event) {
     if (chatId === orderChatId) {
       if (message.message === "/未处理") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleNoProOrder(client, chatId, message, senderTelegramID);
+          await handleNoProOrder(client, chatId, message);
         });
         return;
       }
@@ -152,14 +152,15 @@ async function handleEvent(client, event) {
   if (
     message.media?.className === "MessageMediaPhoto" &&
     typeof message.message === "string" &&
-    message.message.trim().length > 0
+    message.message.trim().length > 0 &&
+    orderRegex.test(message.message)
   ) {
     await handleMerchantOrderMessage(client, chatId, message);
     return;
   }
 
   // ----------- 4. 渠道群回复监听，转发回商户群 -----------
-  if (message.replyTo && message.replyTo.replyToMsgId) {
+  if (message.replyTo && message.replyTo.replyToMsgId && orderRegex.test(message.message)) {
     await handleChannelReply(client, chatId, chatTitle, message);
     return;
   }
@@ -232,8 +233,8 @@ async function handleMerchantOrderMessage(client, chatId, message) {
     const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
 
     if (!targetChatIds.length) {
-      await client.sendMessage(ErrorGroupChatID, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
-      const errorSentMsg = await client.sendFile(ErrorGroupChatID, {
+      await client.sendMessage(orderChatId, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
+      const errorSentMsg = await client.sendFile(orderId, {
         file: message.media,
         caption: `${merchantOrderId}`
       });
@@ -276,7 +277,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     let replyId = null;
 
     if (replyText === null) {
-      await client.sendMessage(ErrorGroupChatID, {
+      await client.sendMessage(orderChatId, {
         message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`
       });
       console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
@@ -355,7 +356,6 @@ async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, cha
     }
   } catch (err) {
     console.error(" 插入 tg_order 失敗:", err.message);
-    return;
   }
 }
 
@@ -366,7 +366,7 @@ async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, cha
  * @param message
  * @returns {Promise<void>}
  */
-async function handleNoProOrder(client, chatId, message, telegramId) {
+async function handleNoProOrder(client, chatId, message) {
 
   const orders = await tgDbService.getPendingOrders();
 
