@@ -8,9 +8,10 @@ const merchantRoutes = require("./routes/tgMerchantRoute");
 const accountRoutes = require("./routes/tgAccountRoute");
 const channelRoutes = require("./routes/tgChannelRoute");
 const orderRoutes = require("./routes/tgOrderRoutes");
-const projectRoutes = require("./routes/projectRoutes");
+const projectRoutes = require("./routes/project/projectRoutes");
 const tgCommandListRoutes = require("./routes/tgCommandListRoutes");
 const tgParameterListRoutes = require("./routes/tgParameterListRoutes");
+const projectDataRoutes = require("./routes/project/projectDataRoutes");
 require("./models/mysqlModel");
 const session = require("express-session");
 
@@ -35,7 +36,7 @@ app.use("/api", merchantRoutes);
 app.use("/api", accountRoutes);
 app.use("/api", channelRoutes);
 app.use("/api", orderRoutes);
-app.use("/api", projectRoutes, tgCommandListRoutes, tgParameterListRoutes);
+app.use("/api", projectRoutes, tgCommandListRoutes, tgParameterListRoutes, projectDataRoutes);
 
 
 module.exports = app;
