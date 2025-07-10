@@ -41,19 +41,38 @@ exports.queryPageData = async (offset = 0, limit = 10, projectId, key) => {
  * @return {Promise<unknown>}
  */
 exports.queryCountData = async (projectId, key) => {
-  return new Promise((resolve,reject) => {
+  return new Promise((resolve, reject) => {
     let sql = `
-      SELECT COUNT(*) AS total
-      FROM dict_data
-      WHERE project_id = ?
-    `
+        SELECT COUNT(*) AS total
+        FROM dict_data
+        WHERE project_id = ?
+    `;
     const values = [projectId];
-    if (key && key !== ""){
-      sql += ` AND \`key\` = ?`
+    if (key && key !== "") {
+      sql += ` AND \`key\` = ?`;
       values.push(key);
     }
-    db.query(sql,values,(err,result) => {
-      if (err) return reject(err)
+    db.query(sql, values, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+/**
+ * 根据projectId,key,value插入一条数据
+ * @param projectId
+ * @param key
+ * @param value
+ * @return {Promise<unknown>}
+ */
+exports.insertData = async (projectId, key, value) => {
+  return new Promise((resolve, reject) => {
+    let sql = `
+        INSERT INTO dict_data (project_id, \`key\`, value)
+        VALUES (?, ?, ?)
+    `;
+    db.query(sql, [projectId,key,value], (err, result) => {
+      if (err) return reject(err);
       resolve(result);
     });
   });
