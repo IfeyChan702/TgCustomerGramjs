@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { success, fail, fail500, success200 } = require("../../utils/responseWrapper");
 const projectService = require("../../service/project/projectService");
+const { exists } = require("node:fs");
 /**
  * 根据projectId，key获取key和value的接口
  * @param projectId
@@ -192,19 +193,62 @@ router.post("/project", async (req, res) => {
   try {
 
     const exists = await projectService.queryProjectByName(projectName.trim());
-    if (exists){
+    if (exists) {
       return res.json(fail("该项目名称已经存在，请勿重复添加"));
     }
 
     const result = await projectService.insertProject(projectName);
-    if (result.affectedRows === 1){
-      res.json(success("项目插入成功！"))
-    }else {
-      res.json(fail("项目添加失败"))
+    if (result.affectedRows === 1) {
+      res.json(success("项目插入成功！"));
+    } else {
+      res.json(fail("项目添加失败"));
     }
   } catch (e) {
     console.error(`[ERROR] 插入失败:`, e);
     res.json(fail("系统操作繁忙，插入失败!"));
+  }
+});
+
+/**
+ * 修改project的数据
+ */
+router.put("/project", async (req, res) => {
+  const { id, projectName } = req.body;
+
+  if (!id || isNaN(parseInt(id))){
+    return res.json(fail("项目的ID不能为空，而且必须为数字"));
+  }
+
+  if (!projectName || projectName.trim() === ""){
+    return  res.json(fail("projectName不能为空!"))
+  }
+
+  const projectId = parseInt(id);
+  const finalName = projectName.trim();
+
+  try {
+
+    const project = await projectService.queryProjectById(projectId);
+    if (!project){
+      return res.json(fail("没有这一条数据,无法修改"));
+    }
+
+    const exists = await projectService.queryProjectByName(finalName);
+    if (exists && exists.id !== projectId) {
+      return res.json(fail("该名称已被其他项目使用，请更换一个名称"));
+    }
+
+    const result = await projectService.updateProjectNameById(projectId,finalName);
+
+    if (result.affectedRows === 1){
+      return res.json(success("修改成功"));
+    }else {
+      return res.json(fail("修改失败"));
+    }
+
+  }catch (err){
+    console.error(`[ERROR] 项目修改失败:`,err);
+    res.json(fail("系统繁忙，修改失败"));
   }
 });
 

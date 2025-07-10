@@ -2,6 +2,7 @@ const util = require("util");
 const db = require("../../models/mysqlModel");
 const { rejects } = require("node:assert");
 const { valueOf } = require("jest");
+const { insertData } = require("./projectDataService");
 
 /**
  * 接口：返回key，value
@@ -280,6 +281,8 @@ exports.deleteById = (deleteId) => {
     });
   });
 };
+
+
 /**
  * 模糊查询，分页查询project
  * @param offset
@@ -354,6 +357,39 @@ exports.insertProject = async (projectName) => {
   return new Promise((resolve, reject) => {
     db.query(sql, [projectName.trim()], (err, result) => {
       if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+/**
+ * 根据id查询用户
+ * @param id
+ * @return {Promise<void>}
+ */
+exports.queryProjectById = async (id) => {
+  const sql = `SELECT *
+               FROM dict_projects
+               WHERE id = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result[0] || null); // 如果没有则返回 null
+    });
+  });
+};
+/**
+ * 根据id修改projectName的数据
+ * @param id
+ * @param projectName
+ * @return {Promise<unknown>}
+ */
+exports.updateProjectNameById = async (id, projectName) => {
+  const sql = `UPDATE dict_projects
+               SET name = ?
+               WHERE id = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [projectName, id], (err, result) => {
+      if (err) reject(err);
       resolve(result);
     });
   });
