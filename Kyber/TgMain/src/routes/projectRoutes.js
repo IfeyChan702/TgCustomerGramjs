@@ -2,10 +2,30 @@ const express = require("express");
 const router = express.Router();
 const { success, fail, fail500, success200 } = require("../utils/responseWrapper");
 const projectService = require("../service/projectService");
+
 /**
- * 根据projectId，key获取key和value的接口
- * @param projectId
- * @param key
+ * @swagger
+ * /project:
+ *   get:
+ *     summary: 根据 projectId 和 key 获取 key 和 value
+ *     tags:
+ *       - Project
+ *     parameters:
+ *       - in: query
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 项目ID
+ *       - in: query
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 数据的 key
+ *     responses:
+ *       200:
+ *         description: 成功获取数据
  */
 router.get("/project", async (req, res) => {
   const { projectId, key } = req.query;
@@ -32,7 +52,15 @@ router.get("/project", async (req, res) => {
 });
 
 /**
- * 获取projectId为1的version和download_url的值
+ * @swagger
+ * /project/version/url:
+ *   get:
+ *     summary: 获取 projectId=1 的 version 和 download_url
+ *     tags:
+ *       - Project
+ *     responses:
+ *       200:
+ *         description: 成功返回版本号和下载链接
  */
 router.get("/project/version/url", async (req, res) => {
   try {
@@ -46,7 +74,43 @@ router.get("/project/version/url", async (req, res) => {
 });
 
 /**
- * 查询项目数据：支持分页、模糊、条件查询project数据
+ * @swagger
+ * /project/data:
+ *   get:
+ *     summary: 查询项目数据（分页、模糊、条件）
+ *     tags:
+ *       - Project
+ *     parameters:
+ *       - in: query
+ *         name: projectId
+ *         schema:
+ *           type: integer
+ *         description: 项目ID
+ *       - in: query
+ *         name: keyword
+ *         schema:
+ *           type: string
+ *         description: 关键字（模糊查询）
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: 编码
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: 当前页码
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: 每页条数
+ *     responses:
+ *       200:
+ *         description: 查询结果
  */
 router.get("/project/data", async (req, res) => {
   const {
@@ -73,7 +137,30 @@ router.get("/project/data", async (req, res) => {
 });
 
 /**
- * 插入project的全部数据
+ * @swagger
+ * /project/data:
+ *   post:
+ *     summary: 插入项目数据
+ *     tags:
+ *       - Project
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               projectName:
+ *                 type: string
+ *               codeTypePre:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               value:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: 插入成功
  */
 router.post("/project/data", async (req, res) => {
   let {
@@ -106,7 +193,31 @@ router.post("/project/data", async (req, res) => {
 });
 
 /**
- * 修改project的数据
+ * @swagger
+ * /project/data:
+ *   put:
+ *     summary: 修改项目数据
+ *     tags:
+ *       - Project
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: integer
+ *                 description: 数据ID
+ *               code:
+ *                 type: string
+ *                 description: 新的编码
+ *               value:
+ *                 type: string
+ *                 description: 新的值
+ *     responses:
+ *       200:
+ *         description: 修改成功
  */
 router.put("/project/data", async (req, res) => {
 
@@ -125,7 +236,22 @@ router.put("/project/data", async (req, res) => {
 });
 
 /**
- * 根据id删除数据
+ * @swagger
+ * /project/data/{id}:
+ *   delete:
+ *     summary: 根据ID删除数据
+ *     tags:
+ *       - Project
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 数据ID
+ *     responses:
+ *       200:
+ *         description: 删除成功
  */
 router.delete("/project/data/:id", async (req, res) => {
 
@@ -146,6 +272,5 @@ router.delete("/project/data/:id", async (req, res) => {
     res.json(fail("系统繁忙,删除失败"));
   }
 });
-
 
 module.exports = router;

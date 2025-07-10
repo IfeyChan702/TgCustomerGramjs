@@ -11,6 +11,7 @@ const orderRoutes = require('./routes/tgOrderRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 require('./models/mysqlModel');
 const session = require('express-session');
+const { swaggerUi, swaggerSpec } = require('./swagger');
 
 const app = express();
 app.use(express.json());
@@ -34,7 +35,12 @@ app.use('/api', accountRoutes);
 app.use('/api', channelRoutes);
 app.use('/api', orderRoutes);
 app.use('/api', projectRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+app.get('/api-docs/swagger.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 module.exports = app;
 
