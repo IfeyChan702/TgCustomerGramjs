@@ -1,8 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { success, fail, fail500, success200 } = require("../utils/responseWrapper");
-const projectService = require("../service/projectService");
-
+const { success, fail, fail500, success200 } = require("../../utils/responseWrapper");
+const projectService = require("../../service/project/projectService");
 /**
  * @swagger
  * /project:
@@ -27,6 +26,7 @@ const projectService = require("../service/projectService");
  *       200:
  *         description: 成功获取数据
  */
+/*
 router.get("/project", async (req, res) => {
   const { projectId, key } = req.query;
   try {
@@ -50,6 +50,7 @@ router.get("/project", async (req, res) => {
     res.json(fail("系统繁忙，请稍后再试"));
   }
 });
+*/
 
 /**
  * @swagger
@@ -112,7 +113,7 @@ router.get("/project/version/url", async (req, res) => {
  *       200:
  *         description: 查询结果
  */
-router.get("/project/data", async (req, res) => {
+/*router.get("/project/data", async (req, res) => {
   const {
     projectId = null,
     keyword = null,
@@ -134,7 +135,7 @@ router.get("/project/data", async (req, res) => {
     console.error(`[ERROR] 查询项目数据失败:`, err);
     res.json(fail(`后台服务器繁忙，查询数据异常`));
   }
-});
+});*/
 
 /**
  * @swagger
@@ -162,7 +163,7 @@ router.get("/project/data", async (req, res) => {
  *       200:
  *         description: 插入成功
  */
-router.post("/project/data", async (req, res) => {
+/*router.post("/project/data", async (req, res) => {
   let {
     projectName,
     codeTypePre,
@@ -190,7 +191,7 @@ router.post("/project/data", async (req, res) => {
     console.error("[ERROR]插入数据失败：", e);
     res.json(fail("系统繁忙，插入数据失败"));
   }
-});
+});*/
 
 /**
  * @swagger
@@ -219,7 +220,7 @@ router.post("/project/data", async (req, res) => {
  *       200:
  *         description: 修改成功
  */
-router.put("/project/data", async (req, res) => {
+/*router.put("/project/data", async (req, res) => {
 
   const { id, code, value } = req.body;
 
@@ -228,12 +229,12 @@ router.put("/project/data", async (req, res) => {
     if (!code && !value) return res.json(fail("code 和 value 不能同时为空"));
 
     await projectService.updateCoVeById(id, code, value);
-    res.json(success("修改成功"))
+    res.json(success("修改成功"));
   } catch (err) {
     console.error("[ERROR] 更新 dict_data 失败：", err);
     res.json(fail("系统错误，更新失败"));
   }
-});
+});*/
 
 /**
  * @swagger
@@ -253,7 +254,7 @@ router.put("/project/data", async (req, res) => {
  *       200:
  *         description: 删除成功
  */
-router.delete("/project/data/:id", async (req, res) => {
+/*router.delete("/project/data/:id", async (req, res) => {
 
   const { id } = req.params;
 
@@ -262,14 +263,73 @@ router.delete("/project/data/:id", async (req, res) => {
 
     const result = await projectService.deleteById(id);
 
-    if (result.affectedRows === 0){
+    if (result.affectedRows === 0) {
       return res.json(fail("未找到对应的数据或者已经删除"));
     }
 
-    res.json(success("删除成功!"))
+    res.json(success("删除成功!"));
   } catch (err) {
     console.error("[ERROR] 删除 dict_data 失败:", err);
     res.json(fail("系统繁忙,删除失败"));
+  }
+});*/
+
+/**
+ * 分页查询,模糊查询project
+ */
+router.get("/project", async (req, res) => {
+  const {
+    page = 0,
+    size = 10,
+    keyword = ""
+  } = req.query;
+  try {
+    const offset = parseInt(size) * parseInt(page);
+    const limit = parseInt(size);
+
+    const projectList = await projectService.queryPageProject(offset, limit, keyword);
+    const countResult = await projectService.queryCountProject(keyword);
+    const total = countResult[0]?.total || 0;
+
+    res.json({
+      projectList,
+      total,
+      page: parseInt(page),
+      size: parseInt(size)
+    });
+
+  } catch (e) {
+    console.error(`[ERROR] 查询项目列表失败:`, e);
+    res.json(fail("系统繁忙，查询失败!"));
+  }
+});
+/**
+ * 插入project数据
+ */
+router.post("/project", async (req, res) => {
+  const {
+    projectName
+  } = req.body;
+  if (!projectName || projectName.trim() === "") {
+    res.json(fail("projectName不能为空!"));
+  }
+
+  try {
+
+    const exists = await projectService.queryProjectByName(projectName.trim());
+    if (exists){
+      return res.json(fail("该项目名称已经存在，请勿重复添加"));
+    }
+
+    const result = await projectService.insertProject(projectName);
+    if (result.affectedRows === 1){
+      res.json(success("项目插入成功！"))
+    }else {
+      res.json(fail("项目添加失败"))
+    }
+  } catch (e) {
+    console.error(`[ERROR] 插入失败:`, e);
+    res.json(fail("系统操作繁忙，插入失败!"));
   }
 });
 
