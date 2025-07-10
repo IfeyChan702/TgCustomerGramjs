@@ -185,15 +185,26 @@ router.post("/project", async (req, res) => {
   const {
     projectName
   } = req.body;
-  if (!projectName) {
+  if (!projectName || projectName.trim() === "") {
     res.json(fail("projectName不能为空!"));
   }
 
   try {
-    await projectService.insertProject(projectName);
-  }catch (e){
-    console.error(`[ERROR] 插入失败:`,e);
-    res.json(fail("系统操作繁忙，插入失败!"))
+
+    const exists = await projectService.queryProjectByName(projectName.trim());
+    if (exists){
+      return res.json(fail("该项目名称已经存在，请勿重复添加"));
+    }
+
+    const result = await projectService.insertProject(projectName);
+    if (result.affectedRows === 1){
+      res.json(success("项目插入成功！"))
+    }else {
+      res.json(fail("项目添加失败"))
+    }
+  } catch (e) {
+    console.error(`[ERROR] 插入失败:`, e);
+    res.json(fail("系统操作繁忙，插入失败!"));
   }
 });
 

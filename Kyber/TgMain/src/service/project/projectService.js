@@ -307,23 +307,40 @@ exports.queryPageProject = async (offset, limit, keyword) => {
  * @return {Promise<unknown>}
  */
 exports.queryCountProject = async (keyword) => {
-  return new Promise((resolve,reject) => {
+  return new Promise((resolve, reject) => {
     let sql = `
-      SELECT COUNT(*) AS total
-      FROM dict_projects
-      WHERE 1 = 1
-    `
+        SELECT COUNT(*) AS total
+        FROM dict_projects
+        WHERE 1 = 1
+    `;
     const values = [];
-    if (keyword && keyword !== ""){
-      sql += ` AND name LIKE ?`
-      values.push(`%${keyword}%`)
+    if (keyword && keyword !== "") {
+      sql += ` AND name LIKE ?`;
+      values.push(`%${keyword}%`);
     }
-    db.query(sql,values,(err,result) => {
-      if (err) return reject(err)
+    db.query(sql, values, (err, result) => {
+      if (err) return reject(err);
       resolve(result);
     });
   });
 };
+/**
+ * 根据projectName查询project的数据
+ * @param projectName
+ * @return {Promise<unknown>}
+ */
+exports.queryProjectByName = async (projectName) => {
+  const sql = `SELECT COUNT(*) AS total
+               FROM dict_projects
+               WHERE name = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [projectName], (err, result) => {
+      if (err) return reject(err);
+      resolve(result[0].total > 0);
+    });
+  });
+};
+
 /**
  * 插入到project一条数据
  * @param projectName
@@ -331,4 +348,13 @@ exports.queryCountProject = async (keyword) => {
  */
 exports.insertProject = async (projectName) => {
 
-}
+  const sql = `INSERT INTO dict_projects (name)
+               VALUES (?)`;
+
+  return new Promise((resolve, reject) => {
+    db.query(sql, [projectName.trim()], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
