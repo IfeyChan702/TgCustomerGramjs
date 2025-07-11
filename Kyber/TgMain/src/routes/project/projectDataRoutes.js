@@ -139,4 +139,35 @@ router.put("/project/data", async (req, res) => {
   }
 
 });
+/**
+ * 删除 project_data数据
+ */
+router.delete("/project/data/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id || isNaN(parseInt(id))) {
+    return res.json(fail("id 不能为空，且必须为数字"));
+  }
+
+  const dataId = parseInt(id);
+
+  try {
+    const origin = await projectDataService.queryDataById(dataId);
+    if (!origin) {
+      return res.json(fail("该 id 对应的数据不存在"));
+    }
+
+    const result = await projectDataService.deleteById(dataId);
+    if (result.affectedRows === 1) {
+      return res.json(success("删除成功！"));
+    } else {
+      return res.json(fail("删除失败！"));
+    }
+
+  } catch (err) {
+    console.error("[ERROR] 删除 project_data 失败:", err);
+    res.json(fail("系统繁忙，删除失败"));
+  }
+});
+
 module.exports = router;

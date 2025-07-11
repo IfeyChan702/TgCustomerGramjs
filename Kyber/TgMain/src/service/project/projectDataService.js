@@ -142,4 +142,17 @@ exports.queryDataByProIdKeyValue = async (projectId, key, value) => {
     });
   });
 };
-
+/**
+ * 根据 id 删除 dict_data 中的数据
+ * @param {number} id
+ * @returns {Promise<*>}
+ */
+exports.deleteById = (id) => {
+  const sql = `DELETE FROM dict_data WHERE id = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
