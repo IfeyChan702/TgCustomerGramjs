@@ -3,8 +3,74 @@ const router = express.Router();
 const tgOrderService = require("../service/tgOrderService");
 const { success, fail } = require("../utils/responseWrapper");
 const tgDbService = require("../service/tgDbService");
+
 /**
- * 模糊查询、条件查询，分页查询--订单数据
+ * @swagger
+ * /tg/order:
+ *   get:
+ *     summary: 订单列表 - 支持模糊、条件、分页查询
+ *     tags: [Telegram Order]
+ *     parameters:
+ *       - in: query
+ *         name: keyword
+ *         schema: { type: string }
+ *         description: 关键字模糊搜索
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: 页码
+ *       - in: query
+ *         name: size
+ *         schema: { type: integer, default: 10 }
+ *         description: 每页条数
+ *       - in: query
+ *         name: status
+ *         schema: { type: integer }
+ *         description: 订单状态
+ *       - in: query
+ *         name: merchantId
+ *         schema: { type: integer }
+ *         description: 商户ID
+ *       - in: query
+ *         name: channelId
+ *         schema: { type: integer }
+ *         description: 渠道ID
+ *       - in: query
+ *         name: merchantOrderId
+ *         schema: { type: string }
+ *         description: 商户订单号
+ *       - in: query
+ *         name: startTime
+ *         schema: { type: string, format: date-time }
+ *         description: 创建开始时间
+ *       - in: query
+ *         name: endTime
+ *         schema: { type: string, format: date-time }
+ *         description: 创建结束时间
+ *     responses:
+ *       200:
+ *         description: 查询成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer }
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: integer }
+ *                           merchant_order_id: { type: string }
+ *                           merchant_chat_id: { type: string }
+ *                           channel_group_id: { type: string }
+ *                           status: { type: integer }
+ *                           created_time: { type: string }
  */
 router.get("/tg/order", async (req, res) => {
   try {
@@ -40,7 +106,32 @@ router.get("/tg/order", async (req, res) => {
 });
 
 /**
- * 插入订单数据
+ * @swagger
+ * /tg/order:
+ *   post:
+ *     summary: 新增订单
+ *     tags: [Telegram Order]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - merchantChatId
+ *               - channelGroupId
+ *               - merchantOrderId
+ *             properties:
+ *               channelMsgId: { type: string, description: '渠道消息ID(可选)' }
+ *               merchantMsgId: { type: string, description: '商户消息ID(可选)' }
+ *               merchantChatId: { type: string, description: '商户群ID' }
+ *               channelGroupId: { type: string, description: '渠道群ID' }
+ *               orderStatus: { type: integer, default: 0, description: '订单状态' }
+ *               merchantOrderId: { type: string, description: '商户订单号' }
+ *               tgReplyId: { type: integer, description: '回复ID(可选)' }
+ *     responses:
+ *       200:
+ *         description: 新增成功
  */
 router.post("/tg/order", async (req, res) => {
   try {
@@ -75,8 +166,22 @@ router.post("/tg/order", async (req, res) => {
     res.json(fail((err.message)));
   }
 });
+
 /**
- * 根据id删除订单
+ * @swagger
+ * /tg/order/{id}:
+ *   delete:
+ *     summary: 删除订单
+ *     tags: [Telegram Order]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: 订单主键ID
+ *     responses:
+ *       200:
+ *         description: 删除成功
  */
 router.delete("/tg/order/:id", async (req, res) => {
   try {
@@ -98,8 +203,25 @@ router.delete("/tg/order/:id", async (req, res) => {
     res.json(fail(err.message));
   }
 });
+
 /**
- * 根据id修改用户的信息
+ * @swagger
+ * /tg/order:
+ *   patch:
+ *     summary: 处理订单状态（按商户订单号处理/更新状态）
+ *     tags: [Telegram Order]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [merchantOrderId]
+ *             properties:
+ *               merchantOrderId: { type: string, description: '商户订单号' }
+ *     responses:
+ *       200:
+ *         description: 处理成功/失败
  */
 router.patch("/tg/order", async (req, res) => {
 
@@ -128,4 +250,5 @@ router.patch("/tg/order", async (req, res) => {
     return res.json(fail(err.message));
   }
 });
+
 module.exports = router;
