@@ -7,5 +7,6 @@ cd TgCustomerGramjs/
 npm install --force
 npm install dotenv -force
 npm install cross-env -force
+npm install swagger-jsdoc swagger-ui-express --save -force
 systemctl restart tg-gramjs.service
 
