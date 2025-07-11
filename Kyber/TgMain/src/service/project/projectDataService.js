@@ -156,3 +156,36 @@ exports.deleteById = (id) => {
     });
   });
 };
+/**
+ * 根据projectId获取key，value
+ * @param projectId
+ * @return {Promise<unknown>}
+ */
+exports.getVersionAndUrlsByProjectId = (projectId) => {
+  const sql = `
+    SELECT \`key\`, value
+    FROM dict_data
+    WHERE project_id = ?
+      AND \`key\` IN ('version', 'download_url')
+  `;
+
+  return new Promise((resolve, reject) => {
+    db.query(sql, [projectId], (err, results) => {
+      if (err) return reject(err);
+
+      let version = "";
+      const domainList = [];
+
+      results.forEach(row => {
+        if (row.key === "version") {
+          version = row.value;
+        } else if (row.key === "download_url") {
+          const urls = row.value.split(",").map(v => v.trim()).filter(v => v);
+          domainList.push(...urls);
+        }
+      });
+
+      resolve({ version, domainList });
+    });
+  });
+};

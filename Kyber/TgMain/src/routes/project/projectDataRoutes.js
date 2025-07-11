@@ -170,4 +170,20 @@ router.delete("/project/data/:id", async (req, res) => {
   }
 });
 
+router.get("/project/data/version", async (req, res) => {
+
+  try {
+    const { version, domainList } = await projectDataService.getVersionAndUrlsByProjectId(parseInt(1));
+
+    return res.json(success200({
+      version,
+      domainList
+    }));
+
+  } catch (err) {
+    console.error("[ERROR] 查询版本信息失败:", err);
+    return res.json(fail500("系统繁忙，获取版本信息失败"));
+  }
+});
+
 module.exports = router;
