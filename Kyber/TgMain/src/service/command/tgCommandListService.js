@@ -147,3 +147,17 @@ exports.updateCommandById = (id, identifier, url, method, description) => {
     });
   });
 };
+/**
+ * 根据id删除
+ * @param id
+ * @return {Promise<unknown>}
+ */
+exports.deleteCommandById = (id) => {
+  const sql = `DELETE FROM tg_command_list WHERE id = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};

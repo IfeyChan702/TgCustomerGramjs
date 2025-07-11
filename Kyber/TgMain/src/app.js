@@ -15,6 +15,7 @@ require('./models/mysqlModel');
 const session = require('express-session');
 const { swaggerUi, swaggerSpec } = require('./swagger');
 
+
 const app = express();
 app.use(express.json());
 

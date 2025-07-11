@@ -1,47 +1,64 @@
+const tgDbService = require("../tgDbService");
+const axios = require("axios");
+/**
+ * 处理命令型的请求
+ * @param inputCommand
+ * @param client
+ * @param chatId
+ * @return {Promise<void>}
+ */
+async function requestUrl(inputCommand, client, chatId) {
 
-/*
-export async function requestUrl(messageText, client, chatId) {
   try {
-    const commandRegex = /^\/request\s+(\w+)\s+(.*?)\s+(https?:\/\/\S+)$/;
-    const match = messageText.match(commandRegex);
-    if (!match) {
-      await client.sendMessage(chatId, {
-        message: "❌ 命令格式错误！请使用格式：/request POST JSON URL"
-      });
-      return;
-    }
-    const reqMethod = match[1].toUpperCase();
-    const rawJson = match[2];
-    const url = match[3];
+    const parts = inputCommand.trim().split(/\s+/);
+    const identifier = parts[0].replace("/hello_", "");
+    const userArgs = parts.slice(1);
 
-    let data = {};
-    try {
-      data = JSON.parse(rawJson);
-    } catch (err) {
-      await client.sendMessage(chatId, {
-        message: `❌ 参数 JSON 解析失败，请检查格式是否正确：${err.message}`
-      });
+    const commandList = await tgDbService.getCommandByIdentifier(identifier);
+    const command = commandList[0];
+    if (!command) {
+      await client.sendMessage(chatId, { message: `❌ 未知命令：/${identifier}` });
       return;
     }
 
-    const res = await axios({
-      method: reqMethod,
-      url,
-      data: ["POST", "PUT", "PATCH"].includes(reqMethod) ? data : undefined,
-      params: reqMethod === "GET" ? data : undefined
+    const params = await tgDbService.getParamsByCommandId(command.id);
+
+    // 检查必填参数数量是否足够
+    const requiredParams = params.filter(p => p.required === 1);
+    if (userArgs.length < requiredParams.length) {
+      await client.sendMessage(chatId, {
+        message: `⚠️ 参数不足，至少需要 ${requiredParams.length} 个参数`
+      });
+      return;
+    }
+
+    const body = {};
+    for (let i = 0; i < params.length; i++) {
+      const paramName = params[i].parameter_name;
+      const userValue = userArgs[i] || "";
+      body[paramName] = userValue;
+    }
+
+    let response;
+    if (command.method.toUpperCase() === "GET") {
+      response = await axios.get(command.url, { params: body });
+    } else {
+      response = await axios.post(command.url, body);
+    }
+
+    const resText = JSON.stringify(response.data, null, 2);
+    await client.sendMessage(chatId, {
+      message: `✅ 请求成功:\n${resText}`
     });
 
+  } catch (e) {
+    console.error(`[ERROR] 机器人调用接口失败:`, e);
     await client.sendMessage(chatId, {
-      message: `✅ 接口调用成功，返回：\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\``
-    });
-  } catch (err) {
-    console.error(`[requestUrl Error]`, err);
-    await client.sendMessage(chatId, {
-      message: `❌ 请求失败：${err.message}`
+      message: `❌ 请求失败：${e?.response?.data?.message || e.message}`
     });
   }
 }
 
 module.exports = {
   requestUrl
-};*/
+};

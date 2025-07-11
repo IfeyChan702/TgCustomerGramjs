@@ -37,7 +37,6 @@ router.get("/tg/command", async (req, res) => {
 router.post("/tg/command", async (req, res) => {
   const { identifier, url, method, description } = req.body;
 
-  // 参数校验
   if (!identifier || identifier.trim() === "") {
     return res.json(fail("identifier 不能为空"));
   }
@@ -107,19 +106,16 @@ router.put("/tg/command/:id", async (req, res) => {
   const finalDesc = description ? description.trim() : "";
 
   try {
-    // 查询原始记录
     const origin = await tgCommandListService.queryCommandById(commandId);
     if (!origin) {
       return res.json(fail("该 ID 对应的数据不存在"));
     }
 
-    // identifier 唯一性校验（排除自身）
     const existing = await tgCommandListService.queryByIdentifier(finalIdentifier);
     if (existing && existing.id !== commandId) {
       return res.json(fail("该 identifier 已存在，不能重复"));
     }
 
-    // 判断是否修改了
     const isUnchanged =
       finalIdentifier === origin.identifier &&
       finalUrl === origin.url &&
@@ -147,6 +143,36 @@ router.put("/tg/command/:id", async (req, res) => {
   } catch (err) {
     console.error(`[ERROR] 修改 tg_command_list 失败:`, err);
     res.json(fail("系统繁忙，修改失败"));
+  }
+});
+/**
+ * 删除
+ */
+router.delete("/tg/command/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id || isNaN(parseInt(id))) {
+    return res.json(fail("id 不能为空且必须为数字"));
+  }
+
+  const commandId = parseInt(id);
+
+  try {
+    const origin = await tgCommandListService.queryCommandById(commandId);
+    if (!origin) {
+      return res.json(fail("该指令不存在，无法删除"));
+    }
+
+    const result = await tgCommandListService.deleteCommandById(commandId);
+    if (result.affectedRows === 1) {
+      return res.json(success("删除成功"));
+    } else {
+      return res.json(fail("删除失败"));
+    }
+
+  } catch (err) {
+    console.error(`[ERROR] 删除 tg_command_list 失败:`, err);
+    res.json(fail("系统繁忙，删除失败"));
   }
 });
 
