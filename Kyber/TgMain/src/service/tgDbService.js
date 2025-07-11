@@ -476,7 +476,7 @@ const updateRunningByAccId = async (accId, isRunning) => {
                 SET is_running = ?
                 WHERE Id = ?`;
   try {
-    const result = await db.query(sql, [isRunning, accId]);
+    const result = await queryAsync(sql, [isRunning, accId]);
     if (result.affectedRows === 0) {
       console.log(`[WARNING] No account found with Id = ${accId}`);
     }
@@ -486,6 +486,30 @@ const updateRunningByAccId = async (accId, isRunning) => {
     throw err;
   }
 };
+/**
+ * 根据identifier查询数据
+ * @param identifier
+ * @return {Promise<*>}
+ */
+const getCommandByIdentifier = async (identifier) => {
+  const sql = `SELECT * FROM tg_command_list WHERE identifier = ? LIMIT 1`;
+  try {
+    return await queryAsync(sql, [identifier]);
+  } catch (err) {
+    console.error(`getCommandByIdentifier 报错：`, err);
+    throw err;
+  }
+}
+
+const getParamsByCommandId = async (commandId) => {
+  const sql = `SELECT * FROM tg_parameter_list WHERE command_list_id = ? ORDER BY id ASC`;
+  try {
+    return await queryAsync(sql, [commandId]);
+  } catch (err) {
+    console.error(`getParamsByCommandId 报错：`, err);
+    throw err;
+  }
+}
 
 
 
@@ -520,5 +544,7 @@ module.exports = {
   checkAndProcessOrder,
   getAccountByIsRunning,
   isAccountExistsWithStatus,
-  updateRunningByAccId
+  updateRunningByAccId,
+  getCommandByIdentifier,
+  getParamsByCommandId
 };

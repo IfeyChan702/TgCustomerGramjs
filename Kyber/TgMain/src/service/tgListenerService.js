@@ -5,6 +5,7 @@ const axios = require("axios");
 const tgDbService = require("./tgDbService");
 const { getOrRunMessageResponse } = require("../utils/lockUtil");
 const { redis } = require("../models/redisModel");
+const handleOrder = require("./handle/handleOrder");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
@@ -86,7 +87,7 @@ async function handleEvent(client, event) {
       }
 
       //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
-      if (!isAuthorized(sender)) {
+      if (!isAuthorized(sender) && chatId === orderChatId) {
         if (message.message === "/start") {
           await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
             await handleStartOrStopOrder(client, chatId, true, 0);
@@ -114,6 +115,12 @@ async function handleEvent(client, event) {
             await handleStopOrderByID(client, chatId, message);
           });
           return;
+        }
+
+        if (message.message.startsWith("/hello_")){
+          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+            await handleOrder.requestUrl(message.message,client, chatId,);
+          });
         }
       }
       if (message.message === "/chatId") {
@@ -594,7 +601,6 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
     });
   }
 }
-
 
 // =================== 模块导出 ====================
 module.exports = {
