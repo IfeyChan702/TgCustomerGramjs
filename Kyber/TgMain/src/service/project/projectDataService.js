@@ -157,7 +157,7 @@ exports.deleteById = (id) => {
   });
 };
 /**
- * 根据projectId获取key，value
+ * 根据projectId获取key为version、download_url的数据
  * @param projectId
  * @return {Promise<unknown>}
  */
