@@ -4,44 +4,6 @@ const { rejects } = require("node:assert");
 const { valueOf } = require("jest");
 const { insertData } = require("./projectDataService");
 
-/**
- *
- * @param projectId
- * @returns {Promise<unknown>}
- */
-exports.getVerDonByProId = async (projectId) => {
-
-  return new Promise((resolve, reject) => {
-    const sql = `
-        SELECT dd.code AS code, dd.value AS value
-        FROM dict_type dt
-            LEFT JOIN dict_data dd
-        ON dd.type_code = dt.code
-        WHERE dt.project_id = ?
-          AND dd.code IN ('version'
-            , 'download_url')
-    `;
-    db.query(sql, [projectId], (err, result) => {
-      if (err) return reject(err);
-
-      let version = "";
-      const domainList = [];
-      result.forEach(item => {
-        if (item.code === "version") {
-          version = item.value;
-        } else if (item.code === "download_url") {
-          if (item.value.includes(",")) {
-            const urls = item.value.split(",").map(url => url.trim()).filter(url => !!url);
-            domainList.push(...urls);
-          } else {
-            domainList.push(item.value.trim());
-          }
-        }
-      });
-      resolve({ version, domainList });
-    });
-  });
-};
 
 /**
  * 根据id删除数据

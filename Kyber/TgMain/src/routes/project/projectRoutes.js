@@ -4,19 +4,6 @@ const { success, fail, fail500, success200 } = require("../../utils/responseWrap
 const projectService = require("../../service/project/projectService");
 const { exists } = require("node:fs");
 
-/**
- * 获取projectId为1的version和download_url的值
- */
-router.get("/project/version/url", async (req, res) => {
-  try {
-    const data = await projectService.getVerDonByProId(1);
-    res.json(success200(data, null));
-
-  } catch (err) {
-    console.error(`[ERROR] 获取版本和下载链接失败，projectId: 1`, err);
-    res.json(fail500("系统繁忙，请稍后再试"));
-  }
-});
 
 /**
  * 分页查询,模糊查询project
