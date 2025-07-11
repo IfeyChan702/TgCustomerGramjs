@@ -1,4 +1,4 @@
-const db = require("../models/mysqlModel");
+const db = require("../../models/mysqlModel");
 
 /**
  * 根据method，identifier条件查询，模糊查询url，identifier，description模糊查询，分页查询
@@ -13,20 +13,20 @@ exports.getPageCommands = (params = {}) => {
 
     const offset = (page - 1) * size;
     const values = [];
-    const countValuse = [];
+    const countValues = [];
 
     let baseSQL = `FROM tg_command_list WHERE 1 = 1`;
 
     if (method) {
       baseSQL += ` AND method = ?`;
       values.push(method);
-      countValuse.push(method);
+      countValues.push(method);
     }
 
     if (identifier) {
       baseSQL += ` AND identifier = ?`;
       values.push(identifier);
-      countValuse.push(identifier);
+      countValues.push(identifier);
     }
 
     if (keyword && keyword !== "") {
@@ -34,15 +34,15 @@ exports.getPageCommands = (params = {}) => {
 
       const likeKeyword = `%${keyword}%`;
       values.push(likeKeyword, likeKeyword, likeKeyword);
-      countValuse.push(likeKeyword, likeKeyword, likeKeyword);
+      countValues.push(likeKeyword, likeKeyword, likeKeyword);
     }
 
     const countSQL = `SELECT COUNT(*) AS total ` + baseSQL;
-    const dataSQL = `SELECT identifier,url,method,description ` + baseSQL + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+    const dataSQL = `SELECT id,identifier,url,method,description ` + baseSQL + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
 
     values.push(size, offset);
 
-    db.query(countSQL, countValuse, (err, countResult) => {
+    db.query(countSQL, countValues, (err, countResult) => {
       if (err) return reject(err);
 
       db.query(dataSQL, values, (err, dataResult) => {
@@ -50,6 +50,8 @@ exports.getPageCommands = (params = {}) => {
 
         resolve({
           total: countResult[0].total,
+          page,
+          size,
           data: dataResult
         });
       });

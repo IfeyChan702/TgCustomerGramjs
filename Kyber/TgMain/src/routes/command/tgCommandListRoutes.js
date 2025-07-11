@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const tgCommandListService = require("../service/tgCommandListService");
-const { success, fail } = require("../utils/responseWrapper");
+const tgCommandListService = require("../../service/command/tgCommandListService");
+const { success, fail } = require("../../utils/responseWrapper");
 
 /**
  * 模糊查询，分页查询，条件查询command
