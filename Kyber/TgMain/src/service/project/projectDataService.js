@@ -71,9 +71,121 @@ exports.insertData = async (projectId, key, value) => {
         INSERT INTO dict_data (project_id, \`key\`, value)
         VALUES (?, ?, ?)
     `;
-    db.query(sql, [projectId,key,value], (err, result) => {
+    db.query(sql, [projectId, key, value], (err, result) => {
       if (err) return reject(err);
       resolve(result);
+    });
+  });
+};
+/**
+ * 根据id修改，key，value
+ * @param id
+ * @return {Promise<unknown>}
+ */
+exports.queryDataById = async (id) => {
+
+  const sql = `SELECT * FROM dict_data WHERE id = ? LIMIT 1`;
+
+  return new Promise((resolve, reject) => {
+
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result[0] || null);
+    });
+  });
+};
+
+exports.updateDataById = async (id, key, value) => {
+  let sql = `UPDATE dict_data SET `;
+  const updates = [];
+  const values = [];
+
+  if (key !== null && key !== undefined) {
+    updates.push("`key` = ?");
+    values.push(key);
+  }
+
+  if (value !== null && value !== undefined) {
+    updates.push("`value` = ?");
+    values.push(value);
+  }
+
+  // 防止 updates 是空的
+  if (updates.length === 0) {
+    throw new Error("没有字段可更新");
+  }
+
+  sql += updates.join(", ") + " WHERE id = ?";
+  values.push(id);
+
+  return new Promise((resolve, reject) => {
+    db.query(sql, values, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+/**
+ * 根据project_id, key, value，查询数据
+ * @param projectId
+ * @param key
+ * @param value
+ * @return {Promise<void>}
+ */
+exports.queryDataByProIdKeyValue = async (projectId, key, value) => {
+  const sql = `SELECT * FROM dict_data WHERE project_id = ? AND \`key\` = ? AND value = ? LIMIT 1`;
+
+  return new Promise((resolve, reject) => {
+    db.query(sql, [projectId, key, value], (err, result) => {
+      if (err) return reject(err);
+      resolve(result[0] || null);
+    });
+  });
+};
+/**
+ * 根据 id 删除 dict_data 中的数据
+ * @param {number} id
+ * @returns {Promise<*>}
+ */
+exports.deleteById = (id) => {
+  const sql = `DELETE FROM dict_data WHERE id = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+/**
+ * 根据projectId获取key为version、download_url的数据
+ * @param projectId
+ * @return {Promise<unknown>}
+ */
+exports.getVersionAndUrlsByProjectId = (projectId) => {
+  const sql = `
+    SELECT \`key\`, value
+    FROM dict_data
+    WHERE project_id = ?
+      AND \`key\` IN ('version', 'download_url')
+  `;
+
+  return new Promise((resolve, reject) => {
+    db.query(sql, [projectId], (err, results) => {
+      if (err) return reject(err);
+
+      let version = "";
+      const domainList = [];
+
+      results.forEach(row => {
+        if (row.key === "version") {
+          version = row.value;
+        } else if (row.key === "download_url") {
+          const urls = row.value.split(",").map(v => v.trim()).filter(v => v);
+          domainList.push(...urls);
+        }
+      });
+
+      resolve({ version, domainList });
     });
   });
 };
