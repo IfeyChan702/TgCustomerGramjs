@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const tgParameterListService = require("../service/tgParameterListService");
-const { success, fail } = require("../utils/responseWrapper");
+const tgParameterListService = require("../../service/command/tgParameterListService");
+const { success, fail } = require("../../utils/responseWrapper");
 
 
 router.get("/tg/parameter", async (req, res) => {
