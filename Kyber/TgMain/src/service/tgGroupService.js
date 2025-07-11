@@ -16,9 +16,9 @@ function withTimeout(promise, timeoutMs, timeoutMsg = 'timeout') {
 async function getGroupsByRegisterId(registerId) {
   const resultList = await tgAccountService.getAllAccounts(registerId);
   const data = resultList[0]; // 取第一个账户
+  console.error('[INVALID DATA]', data);
 
   if (!data || !data.session || !data.api_id || !data.api_hash) {
-    console.error('[INVALID DATA]', data);
     throw new Error('数据库中未找到有效的账户信息');
   }
 

@@ -7,7 +7,13 @@ const replyRoutes = require('./routes/tgReplyRoutes');
 const merchantRoutes = require('./routes/tgMerchantRoute');
 const accountRoutes = require('./routes/tgAccountRoute');
 const channelRoutes = require('./routes/tgChannelRoute');
+const orderRoutes = require('./routes/tgOrderRoutes');
+const projectRoutes = require('./routes/project/projectRoutes');
+const projectDataRoutes = require('./routes/project/projectDataRoutes');
+
 require('./models/mysqlModel');
+const session = require('express-session');
+const { swaggerUi, swaggerSpec } = require('./swagger');
 
 
 const app = express();
@@ -17,6 +23,12 @@ app.use(express.json());
 startRedis();
 
 // 注册路由
+app.use(session({
+  secret: "my-captcha-secret", // 可以自定义
+  resave: false,
+  saveUninitialized: true,
+  cookie: { maxAge: 5 * 60 * 1000 } // 5分钟有效
+}));
 app.use('/api', loginRoutes);
 app.use('/api', exportRoutes);
 app.use('/api/tg', tgRoutes);
@@ -24,6 +36,15 @@ app.use('/api', replyRoutes);
 app.use('/api', merchantRoutes);
 app.use('/api', accountRoutes);
 app.use('/api', channelRoutes);
+app.use('/api', orderRoutes);
+app.use('/api', projectRoutes);
+app.use('/api', projectDataRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+app.get('/api-docs/swagger.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 module.exports = app;
 

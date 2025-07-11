@@ -13,6 +13,7 @@ exports.getPageOrders = (params = {}) => {
       size = 10,
       status = null,
       merchantChatId = null,
+      merchantOrderId = null,
       channelId = null,
       startTime = null,
       endTime = null
@@ -30,7 +31,13 @@ exports.getPageOrders = (params = {}) => {
       WHERE 1 = 1
     `;
 
-    if (status !== null) {
+    if (merchantOrderId !== null && merchantOrderId !== undefined) {
+      baseSQL += ` AND o.merchant_order_id = ?`;
+      values.push(merchantOrderId);
+      countValues.push(merchantOrderId);
+    }
+
+    if (status !== null && status !== undefined) {
       baseSQL += ` AND o.status = ?`;
       values.push(status);
       countValues.push(status);
@@ -48,20 +55,21 @@ exports.getPageOrders = (params = {}) => {
       countValues.push(channelId);
     }
 
-    if (startTime && endTime) {
+    if (startTime?.trim() && endTime?.trim()) {
       baseSQL += ` AND o.created_time BETWEEN ? AND ?`;
       values.push(startTime, endTime);
       countValues.push(startTime, endTime);
     }
 
     if (keyword) {
+      const likeKeyword = `%${keyword}%`;
       baseSQL += ` AND (
-        MATCH(gm.group_name) AGAINST (? IN BOOLEAN MODE) OR
-        MATCH(gc.group_name) AGAINST (? IN BOOLEAN MODE) OR
-        MATCH(tr.match_rule) AGAINST (? IN BOOLEAN MODE)
+        gm.group_name LIKE ? OR
+        gc.group_name LIKE ? OR
+        tr.match_rule LIKE ?
       )`;
-      values.push(keyword, keyword, keyword);
-      countValues.push(keyword, keyword, keyword);
+      values.push(likeKeyword, likeKeyword, likeKeyword);
+      countValues.push(likeKeyword, likeKeyword, likeKeyword);
     }
 
     const countSQL = `SELECT COUNT(*) AS total ` + baseSQL;
@@ -73,13 +81,20 @@ exports.getPageOrders = (params = {}) => {
     values.push(size, offset);
 
     db.query(countSQL, countValues, (err, countResult) => {
-      if (err) return reject(err);
+      if (err) {
+        console.error("Count SQL Error:", err);
+        return reject(err);
+      }
 
       db.query(dataSQL, values, (err, dataResult) => {
-        if (err) return reject(err);
+        if (err) {
+          console.error("Data SQL Error:", err);
+          return reject(err);
+        }
 
         resolve({
-          total: countResult[0].total, data: dataResult
+          total: countResult[0].total,
+          data: dataResult
         });
       });
     });
@@ -97,17 +112,17 @@ exports.insertOrder = (order) => {
         INSERT INTO tg_order
         (channel_msg_id, merchant_msg_id, merchant_chat_id, channel_group_id, status, created_time, merchant_order_id,
          tg_reply_id)
-        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
     `;
 
     const values = [
-      order.channel_msg_id ?? null,
-      order.merchant_msg_id ?? null,
-      order.merchant_chat_id,
-      order.channel_group_id,
-      0, // 默认 status 为 0（未处理）
-      order.merchant_order_id ?? null,
-      order.tg_reply_id ?? null
+      order.channelMsgId ?? null,
+      order.merchantMsgId ?? null,
+      order.merchantChatId,
+      order.channelGroupId,
+      order.orderStatus, // 默认 status 为 0（未处理）
+      order.merchantOrderId,
+      order.tgReplyId ?? 0
     ];
 
     db.query(sql, values, (err, result) => {
@@ -132,16 +147,6 @@ exports.deleteOrderById = (id) => {
       if (err) return reject(err);
       resolve(result);
     });
-  });
-};
-/**
- * 修改订单
- * @param order
- * @returns {Promise<unknown>}
- */
-exports.updateOrder = (order) => {
-  return new Promise((resolve, reject) => {
-
   });
 };
 

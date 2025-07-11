@@ -416,7 +416,7 @@ const getPendingOrders = async () => {
 /**
  * 检验用户状态，并修改用户状态
  * @param merchantOrderId
- * @returns {Promise<void>}
+ * @returns {Promise<{found: boolean}>}
  */
 const checkAndProcessOrder = async (merchantOrderId) => {
 
@@ -457,13 +457,60 @@ const getAccountByIsRunning = async (isRunning) => {
 };
 
 /**
- * 根据ID和status为0查找数据
+ * 根据ID和status查找数据
  */
 const isAccountExistsWithStatus = async (id, accStatus) => {
   const sql = `SELECT 1 FROM tg_accounts WHERE id = ? AND status = ? LIMIT 1`;
   const result = await queryAsync(sql, [id, accStatus]);
   return result.length > 0;
 };
+
+/**
+ * 根据id修改isRunning
+ * @param accId
+ * @param isRunning
+ * @returns {Promise<void>}
+ */
+const updateRunningByAccId = async (accId, isRunning) => {
+  const sql = ` UPDATE tg_accounts
+                SET is_running = ?
+                WHERE Id = ?`;
+  try {
+    const result = await queryAsync(sql, [isRunning, accId]);
+    if (result.affectedRows === 0) {
+      console.log(`[WARNING] No account found with Id = ${accId}`);
+    }
+    return result;
+  } catch (err) {
+    console.error("Failed to update is_running:", err);
+    throw err;
+  }
+};
+/**
+ * 根据identifier查询数据
+ * @param identifier
+ * @return {Promise<*>}
+ */
+const getCommandByIdentifier = async (identifier) => {
+  const sql = `SELECT * FROM tg_command_list WHERE identifier = ? LIMIT 1`;
+  try {
+    return await queryAsync(sql, [identifier]);
+  } catch (err) {
+    console.error(`getCommandByIdentifier 报错：`, err);
+    throw err;
+  }
+}
+
+const getParamsByCommandId = async (commandId) => {
+  const sql = `SELECT * FROM tg_parameter_list WHERE command_list_id = ? ORDER BY id ASC`;
+  try {
+    return await queryAsync(sql, [commandId]);
+  } catch (err) {
+    console.error(`getParamsByCommandId 报错：`, err);
+    throw err;
+  }
+}
+
 
 
 // 统一导出
@@ -496,5 +543,8 @@ module.exports = {
   getPendingOrders,
   checkAndProcessOrder,
   getAccountByIsRunning,
-  isAccountExistsWithStatus
+  isAccountExistsWithStatus,
+  updateRunningByAccId,
+  getCommandByIdentifier,
+  getParamsByCommandId
 };
