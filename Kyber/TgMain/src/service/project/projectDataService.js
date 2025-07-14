@@ -193,3 +193,25 @@ exports.getValueByProjectIdAndKey = (projectId, key) => {
     });
   });
 };
+/**
+ * 根据projectId删除数据
+ * @param projectId
+ * @return {Promise<unknown>}
+ */
+exports.deleteByProjectId = (projectId) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      DELETE FROM dict_data
+      WHERE project_id = ?
+    `;
+
+    db.query(sql, [projectId], (err, result) => {
+      if (err) {
+        console.error("[ERROR] 删除 dict_data 失败:", err);
+        return reject(err);
+      }
+
+      return resolve(result);
+    });
+  });
+};

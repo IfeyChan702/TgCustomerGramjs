@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 const { success, fail, fail500, success200 } = require("../../utils/responseWrapper");
 const projectService = require("../../service/project/projectService");
+const projectDataService = require("../../service/project/projectDataService")
 const { exists } = require("node:fs");
-
 
 /**
  * 分页查询,模糊查询project
@@ -127,26 +127,32 @@ router.put("/project", async (req, res) => {
 router.delete("/project/:id", async (req, res) => {
   const { id } = req.params;
 
-  if (!id || isNaN(parseInt(id))){
-    return res.json(fail("id不饿能未空，必须为数字"));
+  if (!id || isNaN(parseInt(id))) {
+    return res.json(fail("id 不能为空，必须为数字"));
   }
 
   const projectId = parseInt(id);
+
   try {
     const origin = await projectService.queryProjectById(projectId);
+
     if (!origin) {
-      return res.json(fail("该 id 对应的数据不存在"));
+      return res.json(fail("该 id 对应的项目不存在"));
     }
 
+    await projectDataService.deleteByProjectId(projectId);
+
     const result = await projectService.deleteById(projectId);
+
     if (result.affectedRows === 1) {
       return res.json(success("删除成功！"));
     } else {
       return res.json(fail("删除失败"));
     }
-  }catch (e) {
-    console.error(`[ERROR] 删除数据失败:`,e);
-    res.json(fail("系统繁忙，删除失败"))
+
+  } catch (e) {
+    console.error(`[ERROR] 删除项目失败:`, e);
+    res.json(fail("系统繁忙，删除失败"));
   }
 });
 module.exports = router;
