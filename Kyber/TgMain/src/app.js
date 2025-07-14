@@ -10,6 +10,8 @@ const channelRoutes = require('./routes/tgChannelRoute');
 const orderRoutes = require('./routes/tgOrderRoutes');
 const projectRoutes = require('./routes/project/projectRoutes');
 const projectDataRoutes = require('./routes/project/projectDataRoutes');
+const tgParameterListRoutes =require('./routes/command/tgParameterListRoutes')
+const tgCommandListRoutes =require('./routes/command/tgCommandListRoutes')
 
 require('./models/mysqlModel');
 const session = require('express-session');
@@ -37,8 +39,8 @@ app.use('/api', merchantRoutes);
 app.use('/api', accountRoutes);
 app.use('/api', channelRoutes);
 app.use('/api', orderRoutes);
-app.use('/api', projectRoutes);
-app.use('/api', projectDataRoutes);
+app.use('/api', projectDataRoutes,projectRoutes);
+app.use('/api', tgCommandListRoutes,tgParameterListRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/api-docs/swagger.json', (req, res) => {
