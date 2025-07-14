@@ -176,10 +176,13 @@ router.delete("/project/data/:id", async (req, res) => {
   }
 });
 
+/**
+ * 给林辉哥的接口
+ */
 router.get("/project/data/version", async (req, res) => {
 
   try {
-    const { version, domainList } = await projectDataService.getVersionAndUrlsByProjectId(parseInt(1));
+    const { version, domainList } = await projectDataService.getVersionAndUrlsByProjectId(parseInt(0));
 
     return res.json(success200({
       version,
