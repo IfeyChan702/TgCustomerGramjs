@@ -74,9 +74,7 @@ exports.queryCountProject = async (keyword) => {
  * @return {Promise<unknown>}
  */
 exports.queryProjectByName = async (projectName) => {
-  const sql = `SELECT COUNT(*) AS total
-               FROM dict_projects
-               WHERE name = ?`;
+  const sql = `SELECT COUNT(*) AS total FROM dict_projects WHERE name = ?`;
   return new Promise((resolve, reject) => {
     db.query(sql, [projectName], (err, result) => {
       if (err) return reject(err);
@@ -90,13 +88,20 @@ exports.queryProjectByName = async (projectName) => {
  * @param projectName
  * @return {Promise<void>}
  */
-exports.insertProject = async (projectName) => {
+exports.insertProject = async (projectName, id) => {
+  let sql = "";
+  const params = [];
 
-  const sql = `INSERT INTO dict_projects (name)
-               VALUES (?)`;
+  if (typeof id === 'number') {
+    sql = `INSERT INTO dict_projects (id, name) VALUES (?, ?)`;
+    params.push(id, projectName);
+  } else {
+    sql = `INSERT INTO dict_projects (name) VALUES (?)`;
+    params.push(projectName);
+  }
 
   return new Promise((resolve, reject) => {
-    db.query(sql, [projectName.trim()], (err, result) => {
+    db.query(sql, params, (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -108,13 +113,11 @@ exports.insertProject = async (projectName) => {
  * @return {Promise<void>}
  */
 exports.queryProjectById = async (id) => {
-  const sql = `SELECT *
-               FROM dict_projects
-               WHERE id = ?`;
+  const sql = `SELECT * FROM dict_projects WHERE id = ?`;
   return new Promise((resolve, reject) => {
     db.query(sql, [id], (err, result) => {
       if (err) return reject(err);
-      resolve(result[0] || null); // 如果没有则返回 null
+      resolve(result[0] || null);
     });
   });
 };

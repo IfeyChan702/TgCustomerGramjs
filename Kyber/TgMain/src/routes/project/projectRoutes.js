@@ -38,21 +38,36 @@ router.get("/project", async (req, res) => {
  * 插入project数据
  */
 router.post("/project", async (req, res) => {
-  const {
-    projectName
-  } = req.body;
+  const { id, projectName } = req.body;
+
   if (!projectName || projectName.trim() === "") {
-    res.json(fail("projectName不能为空!"));
+    return res.json(fail("projectName不能为空!"));
+  }
+
+  let numericId;
+
+  if (id !== undefined && id !== null && id !== "") {
+    if (isNaN(id)) {
+      return res.json(fail("你的id不是数字，id必须为数字!"));
+    }
+    numericId = Number(id);
   }
 
   try {
-
-    const exists = await projectService.queryProjectByName(projectName.trim());
-    if (exists) {
+    const nameExists = await projectService.queryProjectByName(projectName.trim());
+    if (nameExists) {
       return res.json(fail("该项目名称已经存在，请勿重复添加"));
     }
 
-    const result = await projectService.insertProject(projectName);
+    if (numericId !== undefined) {
+      const existingProject = await projectService.queryProjectById(numericId);
+      if (existingProject) {
+        return res.json(fail("该项目 ID 已存在，请勿重复添加"));
+      }
+    }
+
+    const result = await projectService.insertProject(projectName.trim(), numericId);
+
     if (result.affectedRows === 1) {
       res.json(success("项目插入成功！"));
     } else {
@@ -63,7 +78,6 @@ router.post("/project", async (req, res) => {
     res.json(fail("系统操作繁忙，插入失败!"));
   }
 });
-
 /**
  * 修改project的数据
  */
