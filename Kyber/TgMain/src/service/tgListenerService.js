@@ -85,44 +85,48 @@ async function handleEvent(client, event) {
         });
         return;
       }
+    }
 
-      //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
-      if (!isAuthorized(sender) && chatId === orderChatId) {
-        if (message.message === "/start") {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStartOrStopOrder(client, chatId, true, 0);
-          });
-          return;
-        }
+    if (chatId === ErrorGroupChatID){
+
+        //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
+        if (!isAuthorized(sender)) {
+          if (message.message === "/start") {
+            await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+              await handleStartOrStopOrder(client, chatId, true, 0);
+            });
+            return;
+          }
 
 
-        if (message.message.startsWith("/start_")) {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStartOrderByID(client, chatId, message);
-          });
-          return;
-        }
+          if (message.message.startsWith("/start_")) {
+            await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+              await handleStartOrderByID(client, chatId, message);
+            });
+            return;
+          }
 
-        if (message.message === "/stop") {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStartOrStopOrder(client, chatId, false, 1);
-          });
-          return;
-        }
+          if (message.message === "/stop") {
+            await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+              await handleStartOrStopOrder(client, chatId, false, 1);
+            });
+            return;
+          }
 
-        if (message.message.startsWith("/stop_")) {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStopOrderByID(client, chatId, message);
-          });
-          return;
-        }
+          if (message.message.startsWith("/stop_")) {
+            await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+              await handleStopOrderByID(client, chatId, message);
+            });
+            return;
+          }
 
-        if (message.message.startsWith("/hello_")){
+        if (message.message.startsWith("/")){
           await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
             await handleOrder.requestUrl(message.message,client, chatId,);
           });
         }
       }
+
       if (message.message === "/chatId") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleChatIdOrder(client, chatId, message, chatTitle, chat);
