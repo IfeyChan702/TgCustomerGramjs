@@ -2,6 +2,7 @@ const util = require("util");
 const db = require("../../models/mysqlModel");
 const { rejects } = require("node:assert");
 const { valueOf } = require("jest");
+const domain = require("node:domain");
 
 /**
  * 根据projectId、key条件查询，查询project的数据
@@ -180,12 +181,33 @@ exports.getVersionAndUrlsByProjectId = (projectId) => {
         if (row.key === "version") {
           version = row.value;
         } else if (row.key === "download_url") {
-          const urls = row.value.split(",").map(v => v.trim()).filter(v => v);
+          // 允许多行 download_url，并合并多个逗号分隔的 url
+          const urls = row.value.split(",").map(v => v.trim()).filter(Boolean);
           domainList.push(...urls);
         }
       });
 
-      resolve({ version, domainList });
+      resolve({ version, domainList: domainList });
+    });
+  });
+};
+/**
+ * 根据projectId和key查询value
+ * @param projectId
+ * @param key
+ * @return {Promise<unknown>}
+ */
+exports.getValueByProjectIdAndKey = (projectId, key) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT value
+      FROM dict_data
+      WHERE project_id = ?
+        AND \`key\` = ?
+    `;
+    db.query(sql, [projectId, key], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
     });
   });
 };
