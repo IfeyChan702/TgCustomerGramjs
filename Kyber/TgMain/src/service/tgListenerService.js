@@ -85,9 +85,12 @@ async function handleEvent(client, event) {
         });
         return;
       }
+    }
+
+    if (chatId === ErrorGroupChatID) {
 
       //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
-      if (!isAuthorized(sender) && chatId === orderChatId) {
+      if (!isAuthorized(sender)) {
         if (message.message === "/start") {
           await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
             await handleStartOrStopOrder(client, chatId, true, 0);
@@ -109,7 +112,6 @@ async function handleEvent(client, event) {
           });
           return;
         }
-
         if (message.message.startsWith("/stop_")) {
           await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
             await handleStopOrderByID(client, chatId, message);
@@ -117,12 +119,13 @@ async function handleEvent(client, event) {
           return;
         }
 
-        if (message.message.startsWith("/hello_")){
+        if (message.message.startsWith("/")) {
           await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleOrder.requestUrl(message.message,client, chatId,);
+            await handleOrder.requestUrl(message.message, client, chatId);
           });
         }
       }
+
       if (message.message === "/chatId") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleChatIdOrder(client, chatId, message, chatTitle, chat);
