@@ -39,7 +39,7 @@ router.get("/project/data", async (req, res) => {
 });
 
 /**
- * 查询project的data数据
+ * 新增project的data数据
  */
 router.post("/project/data", async (req, res) => {
   const { projectId, key, value } = req.body;
@@ -77,6 +77,9 @@ router.post("/project/data", async (req, res) => {
     }
 
   } catch (e) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.json(fail("数据库已存在该 key，无需重复修改"));
+    }
     console.error(`[ERROR] 插入projectData失败:`, e);
     res.json(fail("系统繁忙，插入projectData失败"));
   }
@@ -134,6 +137,9 @@ router.put("/project/data", async (req, res) => {
 
 
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.json(fail("数据库已存在该 key，无需重复修改"));
+    }
     console.error(`[ERROR] 修改数据失败:`, err);
     res.json(fail("系统繁忙，修改失败"));
   }
