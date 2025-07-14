@@ -177,36 +177,13 @@ router.delete("/project/data/:id", async (req, res) => {
 });
 
 /**
- * 给林辉哥的接口
- */
-router.get("/project/data/version", async (req, res) => {
-
-  try {
-    const { version, domainList } = await projectDataService.getVersionAndUrlsByProjectId(parseInt(0));
-
-    return res.json(success200({
-      version,
-      domainList
-    }));
-
-  } catch (err) {
-    console.error("[ERROR] 查询版本信息失败:", err);
-    return res.json(fail500("系统繁忙，获取版本信息失败"));
-  }
-});
-
-/**
  * 接口给一个key+projectId获得value
  */
 router.get("/project/data/value", async (req, res) => {
-
-  const { projectId, key } = req.query;
+  const { projectId, key = "" } = req.query;
 
   if (!projectId || isNaN(parseInt(projectId))) {
     return res.json(fail("projectId 不能为空且必须为数字"));
-  }
-  if (!key || key.trim() === "") {
-    return res.json(fail("key 不能为空"));
   }
 
   const proId = parseInt(projectId);
@@ -215,14 +192,17 @@ router.get("/project/data/value", async (req, res) => {
   try {
     const result = await projectDataService.getValueByProjectIdAndKey(proId, finalKey);
 
-    let value = "";
-    if (result.length > 0) {
-      value = result.map(row => row.value).join(","); // 若有多条记录，拼接起来
+    let responseData = {};
+
+    if (finalKey) {
+      responseData[finalKey] = result.map(row => row.value).join(",");
+    } else {
+      result.forEach(row => {
+        responseData[row.key] = row.value;
+      });
     }
 
-    res.json(success200({
-      [finalKey]: value  // 如 key 是 download_url，则返回 { "download_url": "value" }
-    }));
+    res.json(success200(responseData));
   } catch (err) {
     console.error(`[ERROR] 查询数据失败:`, err);
     res.json(fail500("系统繁忙，查询失败"));

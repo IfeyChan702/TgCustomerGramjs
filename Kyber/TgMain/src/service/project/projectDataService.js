@@ -85,7 +85,9 @@ exports.insertData = async (projectId, key, value) => {
  */
 exports.queryDataById = async (id) => {
 
-  const sql = `SELECT * FROM dict_data WHERE id = ? LIMIT 1`;
+  const sql = `SELECT *
+               FROM dict_data
+               WHERE id = ? LIMIT 1`;
 
   return new Promise((resolve, reject) => {
 
@@ -97,7 +99,8 @@ exports.queryDataById = async (id) => {
 };
 
 exports.updateDataById = async (id, key, value) => {
-  let sql = `UPDATE dict_data SET `;
+  let sql = `UPDATE dict_data
+             SET `;
   const updates = [];
   const values = [];
 
@@ -134,7 +137,11 @@ exports.updateDataById = async (id, key, value) => {
  * @return {Promise<void>}
  */
 exports.queryDataByProIdKeyValue = async (projectId, key, value) => {
-  const sql = `SELECT * FROM dict_data WHERE project_id = ? AND \`key\` = ? AND value = ? LIMIT 1`;
+  const sql = `SELECT *
+               FROM dict_data
+               WHERE project_id = ?
+                 AND \`key\` = ?
+                 AND value = ? LIMIT 1`;
 
   return new Promise((resolve, reject) => {
     db.query(sql, [projectId, key, value], (err, result) => {
@@ -149,45 +156,13 @@ exports.queryDataByProIdKeyValue = async (projectId, key, value) => {
  * @returns {Promise<*>}
  */
 exports.deleteById = (id) => {
-  const sql = `DELETE FROM dict_data WHERE id = ?`;
+  const sql = `DELETE
+               FROM dict_data
+               WHERE id = ?`;
   return new Promise((resolve, reject) => {
     db.query(sql, [id], (err, result) => {
       if (err) return reject(err);
       resolve(result);
-    });
-  });
-};
-/**
- * 根据projectId获取key为version、download_url的数据
- * @param projectId
- * @return {Promise<unknown>}
- */
-exports.getVersionAndUrlsByProjectId = (projectId) => {
-  const sql = `
-    SELECT \`key\`, value
-    FROM dict_data
-    WHERE project_id = ?
-      AND \`key\` IN ('version', 'download_url')
-  `;
-
-  return new Promise((resolve, reject) => {
-    db.query(sql, [projectId], (err, results) => {
-      if (err) return reject(err);
-
-      let version = "";
-      const domainList = [];
-
-      results.forEach(row => {
-        if (row.key === "version") {
-          version = row.value;
-        } else if (row.key === "download_url") {
-          // 允许多行 download_url，并合并多个逗号分隔的 url
-          const urls = row.value.split(",").map(v => v.trim()).filter(Boolean);
-          domainList.push(...urls);
-        }
-      });
-
-      resolve({ version, domainList: domainList });
     });
   });
 };
@@ -199,13 +174,20 @@ exports.getVersionAndUrlsByProjectId = (projectId) => {
  */
 exports.getValueByProjectIdAndKey = (projectId, key) => {
   return new Promise((resolve, reject) => {
-    const sql = `
-      SELECT value
-      FROM dict_data
-      WHERE project_id = ?
-        AND \`key\` = ?
+    let sql = `
+        SELECT \`key\`, value
+        FROM dict_data
+        WHERE project_id = ?
     `;
-    db.query(sql, [projectId, key], (err, result) => {
+    const values = [projectId];
+
+    // 只有当 key 非空字符串才加条件
+    if (key && key.trim() !== "") {
+      sql += ` AND \`key\` = ?`;
+      values.push(key.trim());
+    }
+
+    db.query(sql, values, (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
