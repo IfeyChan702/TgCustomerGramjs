@@ -77,7 +77,7 @@ router.post("/project/data", async (req, res) => {
     }
 
   } catch (e) {
-    if (err.code === 'ER_DUP_ENTRY') {
+    if (err.code === "ER_DUP_ENTRY") {
       return res.json(fail("数据库已存在该 key，无需重复修改"));
     }
     console.error(`[ERROR] 插入projectData失败:`, e);
@@ -137,7 +137,7 @@ router.put("/project/data", async (req, res) => {
 
 
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
+    if (err.code === "ER_DUP_ENTRY") {
       return res.json(fail("数据库已存在该 key，无需重复修改"));
     }
     console.error(`[ERROR] 修改数据失败:`, err);
@@ -192,6 +192,40 @@ router.get("/project/data/version", async (req, res) => {
   } catch (err) {
     console.error("[ERROR] 查询版本信息失败:", err);
     return res.json(fail500("系统繁忙，获取版本信息失败"));
+  }
+});
+
+/**
+ * 接口给一个key+projectId获得value
+ */
+router.get("/project/data/value", async (req, res) => {
+
+  const { projectId, key } = req.query;
+
+  if (!projectId || isNaN(parseInt(projectId))) {
+    return res.json(fail("projectId 不能为空且必须为数字"));
+  }
+  if (!key || key.trim() === "") {
+    return res.json(fail("key 不能为空"));
+  }
+
+  const proId = parseInt(projectId);
+  const finalKey = key.trim();
+
+  try {
+    const result = await projectDataService.getValueByProjectIdAndKey(proId, finalKey);
+
+    let value = "";
+    if (result.length > 0) {
+      value = result.map(row => row.value).join(","); // 若有多条记录，拼接起来
+    }
+
+    res.json(success200({
+      [finalKey]: value  // 如 key 是 download_url，则返回 { "download_url": "value" }
+    }));
+  } catch (err) {
+    console.error(`[ERROR] 查询数据失败:`, err);
+    res.json(fail500("系统繁忙，查询失败"));
   }
 });
 

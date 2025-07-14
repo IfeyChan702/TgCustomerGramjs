@@ -191,4 +191,23 @@ exports.getVersionAndUrlsByProjectId = (projectId) => {
     });
   });
 };
-
+/**
+ * 根据projectId和key查询value
+ * @param projectId
+ * @param key
+ * @return {Promise<unknown>}
+ */
+exports.getValueByProjectIdAndKey = (projectId, key) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT value
+      FROM dict_data
+      WHERE project_id = ?
+        AND \`key\` = ?
+    `;
+    db.query(sql, [projectId, key], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
