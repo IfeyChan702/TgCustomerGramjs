@@ -11,7 +11,7 @@ async function requestUrl(inputCommand, client, chatId) {
 
   try {
     const parts = inputCommand.trim().split(/\s+/);
-    const identifier = parts[0].replace("/hello_", "");
+    const identifier = parts[0].replace("/", "");
     const userArgs = parts.slice(1);
 
     const commandList = await tgDbService.getCommandByIdentifier(identifier);
