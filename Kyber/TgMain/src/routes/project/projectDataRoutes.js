@@ -125,7 +125,6 @@ router.put("/project/data", async (req, res) => {
       return res.json(fail("key、value 和 description 都未变化，无需修改"));
     }
 
-    // 判断项目中是否已存在相同的 key + value
     const exists = await projectDataService.queryDataByProIdKeyValue(
       origin.project_id,
       finalKey,
@@ -135,20 +134,17 @@ router.put("/project/data", async (req, res) => {
       return res.json(fail("该 key 和 value 在项目中已存在"));
     }
 
-    // 执行更新
     const result = await projectDataService.updateDataById(
       dataId,
       finalKey,
       finalValue,
       finalDescription
     );
-
     if (result.affectedRows === 1) {
       return res.json(success("修改成功！"));
     } else {
       return res.json(fail("修改失败！"));
     }
-
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.json(fail("数据库已存在该 key，无需重复修改"));
@@ -157,7 +153,6 @@ router.put("/project/data", async (req, res) => {
     res.json(fail("系统繁忙，修改失败"));
   }
 });
-
 /**
  * 删除 project_data数据
  */
