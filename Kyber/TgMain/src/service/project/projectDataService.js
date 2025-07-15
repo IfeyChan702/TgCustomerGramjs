@@ -97,33 +97,22 @@ exports.queryDataById = async (id) => {
     });
   });
 };
-
-exports.updateDataById = async (id, key, value) => {
-  let sql = `UPDATE dict_data
-             SET `;
-  const updates = [];
-  const values = [];
-
-  if (key !== null && key !== undefined) {
-    updates.push("`key` = ?");
-    values.push(key);
-  }
-
-  if (value !== null && value !== undefined) {
-    updates.push("`value` = ?");
-    values.push(value);
-  }
-
-  // 防止 updates 是空的
-  if (updates.length === 0) {
-    throw new Error("没有字段可更新");
-  }
-
-  sql += updates.join(", ") + " WHERE id = ?";
-  values.push(id);
-
+/**
+ * 根据id修改projectData的数据
+ * @param id
+ * @param key
+ * @param value
+ * @param description
+ * @return {Promise<unknown>}
+ */
+exports.updateDataById = async (id, key, value, description) => {
   return new Promise((resolve, reject) => {
-    db.query(sql, values, (err, result) => {
+    const sql = `
+      UPDATE dict_data
+      SET \`key\` = ?, value = ?, description = ?
+      WHERE id = ?
+    `;
+    db.query(sql, [key, value, description, id], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
