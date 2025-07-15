@@ -16,7 +16,7 @@ exports.queryPageData = async (offset = 0, limit = 10, projectId, key) => {
 
   return new Promise((resolve, reject) => {
     let sql = `
-        SELECT id, \`key\`, value
+        SELECT id, \`key\`, value, description
         FROM dict_data
         WHERE project_id = ?
     `;
@@ -66,13 +66,13 @@ exports.queryCountData = async (projectId, key) => {
  * @param value
  * @return {Promise<unknown>}
  */
-exports.insertData = async (projectId, key, value) => {
+exports.insertData = async (projectId, key, value, description) => {
   return new Promise((resolve, reject) => {
-    let sql = `
-        INSERT INTO dict_data (project_id, \`key\`, value)
-        VALUES (?, ?, ?)
+    const sql = `
+        INSERT INTO dict_data (project_id, \`key\`, value, description)
+        VALUES (?, ?, ?, ?)
     `;
-    db.query(sql, [projectId, key, value], (err, result) => {
+    db.query(sql, [projectId, key, value, description || null], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -97,33 +97,24 @@ exports.queryDataById = async (id) => {
     });
   });
 };
-
-exports.updateDataById = async (id, key, value) => {
-  let sql = `UPDATE dict_data
-             SET `;
-  const updates = [];
-  const values = [];
-
-  if (key !== null && key !== undefined) {
-    updates.push("`key` = ?");
-    values.push(key);
-  }
-
-  if (value !== null && value !== undefined) {
-    updates.push("`value` = ?");
-    values.push(value);
-  }
-
-  // 防止 updates 是空的
-  if (updates.length === 0) {
-    throw new Error("没有字段可更新");
-  }
-
-  sql += updates.join(", ") + " WHERE id = ?";
-  values.push(id);
-
+/**
+ * 根据id修改projectData的数据
+ * @param id
+ * @param key
+ * @param value
+ * @param description
+ * @return {Promise<unknown>}
+ */
+exports.updateDataById = async (id, key, value, description) => {
   return new Promise((resolve, reject) => {
-    db.query(sql, values, (err, result) => {
+    const sql = `
+        UPDATE dict_data
+        SET \`key\`     = ?,
+            value       = ?,
+            description = ?
+        WHERE id = ?
+    `;
+    db.query(sql, [key, value, description, id], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -201,8 +192,9 @@ exports.getValueByProjectIdAndKey = (projectId, key) => {
 exports.deleteByProjectId = (projectId) => {
   return new Promise((resolve, reject) => {
     const sql = `
-      DELETE FROM dict_data
-      WHERE project_id = ?
+        DELETE
+        FROM dict_data
+        WHERE project_id = ?
     `;
 
     db.query(sql, [projectId], (err, result) => {

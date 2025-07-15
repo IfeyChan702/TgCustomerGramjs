@@ -42,7 +42,7 @@ router.get("/project/data", async (req, res) => {
  * 新增project的data数据
  */
 router.post("/project/data", async (req, res) => {
-  const { projectId, key, value } = req.body;
+  const { projectId, key, value, description } = req.body;
 
   // 参数校验
   if (!projectId) {
@@ -68,7 +68,7 @@ router.post("/project/data", async (req, res) => {
       return res.json(fail("这个项目的key已经存在"));
     }
 
-    const insertResult = await projectDataService.insertData(proId, finalKey, finalValue);
+    const insertResult = await projectDataService.insertData(proId, finalKey, finalValue, description);
 
     if (insertResult.affectedRows === 1) {
       return res.json(success("数据插入成功!"));
@@ -88,8 +88,7 @@ router.post("/project/data", async (req, res) => {
  * 修改project的data
  */
 router.put("/project/data", async (req, res) => {
-
-  const { id, key, value } = req.body;
+  const { id, key, value, description } = req.body;
 
   if (!id || isNaN(parseInt(id))) {
     return res.json(fail("id不能为空且必须为数字"));
@@ -98,43 +97,57 @@ router.put("/project/data", async (req, res) => {
   const dataId = parseInt(id);
   const hasNewKey = typeof key === "string" && key.trim() !== "";
   const hasNewValue = value !== undefined && value !== null && value.toString().trim() !== "";
+  const hasNewDescription = description !== undefined;
 
-  if (!hasNewKey && !hasNewValue) {
-    return res.json(fail("newKey 和 newValue 不能同时为空"));
+  if (!hasNewKey && !hasNewValue && !hasNewDescription) {
+    return res.json(fail("key、value 和 description 不能同时为空"));
   }
 
   const finalNewKey = hasNewKey ? key.trim() : null;
   const finalNewValue = hasNewValue ? value.toString().trim() : null;
+  const finalNewDescription = hasNewDescription ? description.toString().trim() : null;
 
   try {
-
     const origin = await projectDataService.queryDataById(dataId);
     if (!origin) {
       return res.json(fail("该 id 对应的数据不存在"));
     }
 
-    const finalKey = finalNewKey || origin.key;
-    const finalValue = finalNewValue || origin.value;
+    const finalKey = finalNewKey ?? origin.key;
+    const finalValue = finalNewValue ?? origin.value;
+    const finalDescription = finalNewDescription ?? origin.description;
 
     const isKeySame = finalKey === origin.key;
     const isValueSame = finalValue === origin.value;
+    const isDescriptionSame = finalDescription === origin.description;
 
-    if (isKeySame && isValueSame) {
-      return res.json(fail("key 和 value 都未变化，无需修改"));
+    if (isKeySame && isValueSame && isDescriptionSame) {
+      return res.json(fail("key、value 和 description 都未变化，无需修改"));
     }
 
-    const exists = await projectDataService.queryDataByProIdKeyValue(origin.project_id, finalKey, finalValue);
+    // 判断项目中是否已存在相同的 key + value
+    const exists = await projectDataService.queryDataByProIdKeyValue(
+      origin.project_id,
+      finalKey,
+      finalValue
+    );
     if (exists && exists.id !== dataId) {
       return res.json(fail("该 key 和 value 在项目中已存在"));
     }
 
-    const result = await projectDataService.updateDataById(dataId, finalKey, finalValue);
+    // 执行更新
+    const result = await projectDataService.updateDataById(
+      dataId,
+      finalKey,
+      finalValue,
+      finalDescription
+    );
+
     if (result.affectedRows === 1) {
       return res.json(success("修改成功！"));
     } else {
       return res.json(fail("修改失败！"));
     }
-
 
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
@@ -143,8 +156,8 @@ router.put("/project/data", async (req, res) => {
     console.error(`[ERROR] 修改数据失败:`, err);
     res.json(fail("系统繁忙，修改失败"));
   }
-
 });
+
 /**
  * 删除 project_data数据
  */
