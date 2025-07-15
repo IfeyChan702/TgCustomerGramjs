@@ -42,7 +42,7 @@ router.get("/project/data", async (req, res) => {
  * 新增project的data数据
  */
 router.post("/project/data", async (req, res) => {
-  const { projectId, key, value } = req.body;
+  const { projectId, key, value, description} = req.body;
 
   // 参数校验
   if (!projectId) {
@@ -68,7 +68,7 @@ router.post("/project/data", async (req, res) => {
       return res.json(fail("这个项目的key已经存在"));
     }
 
-    const insertResult = await projectDataService.insertData(proId, finalKey, finalValue);
+    const insertResult = await projectDataService.insertData(proId, finalKey, finalValue,description);
 
     if (insertResult.affectedRows === 1) {
       return res.json(success("数据插入成功!"));

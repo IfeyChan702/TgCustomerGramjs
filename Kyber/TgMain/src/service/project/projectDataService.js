@@ -66,13 +66,13 @@ exports.queryCountData = async (projectId, key) => {
  * @param value
  * @return {Promise<unknown>}
  */
-exports.insertData = async (projectId, key, value) => {
+exports.insertData = async (projectId, key, value, description) => {
   return new Promise((resolve, reject) => {
-    let sql = `
-        INSERT INTO dict_data (project_id, \`key\`, value)
-        VALUES (?, ?, ?)
+    const sql = `
+        INSERT INTO dict_data (project_id, \`key\`, value, description)
+        VALUES (?, ?, ?, ?)
     `;
-    db.query(sql, [projectId, key, value], (err, result) => {
+    db.query(sql, [projectId, key, value, description || null], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -201,8 +201,9 @@ exports.getValueByProjectIdAndKey = (projectId, key) => {
 exports.deleteByProjectId = (projectId) => {
   return new Promise((resolve, reject) => {
     const sql = `
-      DELETE FROM dict_data
-      WHERE project_id = ?
+        DELETE
+        FROM dict_data
+        WHERE project_id = ?
     `;
 
     db.query(sql, [projectId], (err, result) => {
