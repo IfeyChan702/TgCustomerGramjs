@@ -16,7 +16,7 @@ exports.queryPageData = async (offset = 0, limit = 10, projectId, key) => {
 
   return new Promise((resolve, reject) => {
     let sql = `
-        SELECT id, \`key\`, value
+        SELECT id, \`key\`, value, description
         FROM dict_data
         WHERE project_id = ?
     `;
@@ -108,9 +108,11 @@ exports.queryDataById = async (id) => {
 exports.updateDataById = async (id, key, value, description) => {
   return new Promise((resolve, reject) => {
     const sql = `
-      UPDATE dict_data
-      SET \`key\` = ?, value = ?, description = ?
-      WHERE id = ?
+        UPDATE dict_data
+        SET \`key\`     = ?,
+            value       = ?,
+            description = ?
+        WHERE id = ?
     `;
     db.query(sql, [key, value, description, id], (err, result) => {
       if (err) return reject(err);
