@@ -77,7 +77,7 @@ router.post("/project/data", async (req, res) => {
     }
 
   } catch (e) {
-    if (err.code === "ER_DUP_ENTRY") {
+    if (e.code === "ER_DUP_ENTRY") {
       return res.json(fail("数据库已存在该 key，无需重复修改"));
     }
     console.error(`[ERROR] 插入projectData失败:`, e);
