@@ -166,7 +166,7 @@ async function handleEvent(client, event) {
   }
 
   // ----------- 4. 渠道群回复监听，转发回商户群 -----------
-  if (message.replyTo && message.replyTo.replyToMsgId && orderRegex.test(message.message)) {
+  if (message.replyTo && message.replyTo.replyToMsgId) {
     await handleChannelReply(client, chatId, chatTitle, message);
     return;
   }
