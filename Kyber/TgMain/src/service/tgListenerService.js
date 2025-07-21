@@ -88,7 +88,7 @@ async function handleEvent(client, event) {
     }
 
 
-    if (await isAuthorized(sender)) {
+    if (chatId === ErrorGroupChatID) {
       if (message.message === "/start") {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleStartOrStopOrder(client, chatId, true, 0);
