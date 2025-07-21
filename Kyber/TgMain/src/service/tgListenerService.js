@@ -123,12 +123,12 @@ async function handleEvent(client, event) {
         });
         return;
       }
+    }
 
-      if (message.message.startsWith("/")) {
-        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleOrder.requestUrl(message.message, client, chatId);
-        });
-      }
+    if (message.message.startsWith("/")) {
+      await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+        await handleOrder.requestUrl(message.message, client, chatId);
+      });
     }
   }
 
