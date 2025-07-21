@@ -6,11 +6,11 @@ const tgDbService = require("./tgDbService");
 const { getOrRunMessageResponse } = require("../utils/lockUtil");
 const { redis } = require("../models/redisModel");
 const handleOrder = require("./handle/handleOrder");
+const telegramPermissionService = require("../service/permission/telegramPremissionService");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
 const orderChatId = -4856325360;//线上的命令群
-const ADMIN_USER_IDS = ["12345678"];
 
 // 启动所有账户监听
 async function startOrderListener() {
@@ -38,7 +38,7 @@ async function startOrderListener() {
     }, 100000);
     clients.push({ id: acc.Id, client });
   }
-
+  await telegramPermissionService.initPermissionsFromDatabase();
   console.log("[Telegram] 所有账号监听已启动");
 }
 
@@ -87,43 +87,34 @@ async function handleEvent(client, event) {
       }
     }
 
-    if (chatId === ErrorGroupChatID) {
 
-      //TODO 这里需要更改一下，测试的时候不用,这里的if之后可能也需要更改一下
-      if (!isAuthorized(sender)) {
-        if (message.message === "/start") {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStartOrStopOrder(client, chatId, true, 0);
-          });
-          return;
-        }
+    if (await isAuthorized(sender)) {
+      if (message.message === "/start") {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleStartOrStopOrder(client, chatId, true, 0);
+        });
+        return;
+      }
 
 
-        if (message.message.startsWith("/start_")) {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStartOrderByID(client, chatId, message);
-          });
-          return;
-        }
+      if (message.message.startsWith("/start_")) {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleStartOrderByID(client, chatId, message);
+        });
+        return;
+      }
 
-        if (message.message === "/stop") {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStartOrStopOrder(client, chatId, false, 1);
-          });
-          return;
-        }
-        if (message.message.startsWith("/stop_")) {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleStopOrderByID(client, chatId, message);
-          });
-          return;
-        }
-
-        if (message.message.startsWith("/")) {
-          await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-            await handleOrder.requestUrl(message.message, client, chatId);
-          });
-        }
+      if (message.message === "/stop") {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleStartOrStopOrder(client, chatId, false, 1);
+        });
+        return;
+      }
+      if (message.message.startsWith("/stop_")) {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleStopOrderByID(client, chatId, message);
+        });
+        return;
       }
 
       if (message.message === "/chatId") {
@@ -132,8 +123,13 @@ async function handleEvent(client, event) {
         });
         return;
       }
-    }
 
+      if (message.message.startsWith("/")) {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleOrder.requestUrl(message.message, client, chatId);
+        });
+      }
+    }
   }
 
   // ----------- 1. 标记渠道群 -----------
@@ -347,11 +343,11 @@ function removeClientById(id) {
 
 /**
  * 权限处理
- * @param userId
+ * @param telegramId
  * @returns {*}
  */
-function isAuthorized(userId) {
-  return ADMIN_USER_IDS.includes(userId);
+async function isAuthorized(telegramId) {
+  return await telegramPermissionService.isAdminOrSuperuser(telegramId);
 }
 
 async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId) {
