@@ -494,13 +494,18 @@ const updateRunningByAccId = async (accId, isRunning) => {
 const getCommandByIdentifier = async (identifier) => {
   const sql = `SELECT * FROM tg_command_list WHERE identifier = ? LIMIT 1`;
   try {
-    return await queryAsync(sql, [identifier]);
+    const result = await queryAsync(sql, [identifier]);
+    return result[0] || null;
   } catch (err) {
     console.error(`getCommandByIdentifier 报错：`, err);
     throw err;
   }
 }
-
+/**
+ * 根据commandId查询参数
+ * @param commandId
+ * @return {Promise<unknown>}
+ */
 const getParamsByCommandId = async (commandId) => {
   const sql = `SELECT * FROM tg_parameter_list WHERE command_list_id = ? ORDER BY id ASC`;
   try {
@@ -510,7 +515,22 @@ const getParamsByCommandId = async (commandId) => {
     throw err;
   }
 }
-
+/**
+ * 根据commandId，groupId查询权限状态
+ * @param commandId
+ * @param groupId
+ * @return {Promise<boolean>}
+ */
+const isGroupAllowedForCommand = async (commandId,groupId) => {
+  const sql = `SELECT 1 FROM tg_command_group_permission WHERE command_id = ? AND group_id = ? AND status = 1`;
+  try {
+    const result = await queryAsync(sql,[commandId,groupId]);
+    return result.length > 0;
+  }catch (err){
+    console.error(`isGroupAllowedForCommand 报错：`, err);
+    throw err
+  }
+}
 
 
 // 统一导出
@@ -546,5 +566,6 @@ module.exports = {
   isAccountExistsWithStatus,
   updateRunningByAccId,
   getCommandByIdentifier,
-  getParamsByCommandId
+  getParamsByCommandId,
+  isGroupAllowedForCommand
 };

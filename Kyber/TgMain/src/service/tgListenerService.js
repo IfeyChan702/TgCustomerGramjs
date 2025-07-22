@@ -38,7 +38,6 @@ async function startOrderListener() {
     }, 100000);
     clients.push({ id: acc.Id, client });
   }
-  await telegramPermissionService.initPermissionsFromDatabase();
   console.log("[Telegram] 所有账号监听已启动");
 }
 
@@ -69,6 +68,12 @@ async function handleEvent(client, event) {
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
   ) {
+    if (message.message === "hello") {
+      await client.sendMessage(chatId, {
+        message: "你好",
+        replyTo: message.id
+      });
+    }
     //0是关闭，1是开启
     //orderChatId
     //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
@@ -124,10 +129,20 @@ async function handleEvent(client, event) {
         return;
       }
     }
-
     if (message.message.startsWith("/")) {
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-        await handleOrder.requestUrl(message.message, client, chatId);
+        const parts = message.message.trim().split(/\s+/);
+        const identifier = parts[0].replace("/", "");
+        const userArgs = parts.slice(1);
+        const command = await tgDbService.getCommandByIdentifier(identifier);
+        if (!command) {
+          console.warn(`命令${message.message} 不存在`);
+          await client.sendMessage(chatId, { message: `❌ 未知命令：${message.message}` });
+          return false;
+        }
+        if (await isAuthorized(command,chatId)) {
+          await handleOrder.requestUrl(command,userArgs,message.message, client, chatId);
+        }
       });
     }
   }
@@ -342,12 +357,24 @@ function removeClientById(id) {
 }
 
 /**
- * 权限处理
- * @param telegramId
+ * 群的权限处理
+ * @param command
+ * @param chatId
  * @returns {*}
  */
-async function isAuthorized(telegramId) {
-  return await telegramPermissionService.isAdminOrSuperuser(telegramId);
+async function isAuthorized(command,chatId) {
+  try {
+
+    if (command.allow_all === 1){
+      return true;
+    }
+
+    return await tgDbService.isGroupAllowedForCommand(command.id, chatId);
+
+  } catch (err) {
+    console.error(`isAuthorized 报错:`, err);
+    return false;
+  }
 }
 
 async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId) {
