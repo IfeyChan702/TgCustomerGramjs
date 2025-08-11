@@ -6,6 +6,8 @@ const tgDbService = require("./tgDbService");
 const { getOrRunMessageResponse } = require("../utils/lockUtil");
 const { redis } = require("../models/redisModel");
 const handleOrder = require("./handle/handleOrder");
+const handleRate = require("./handle/handleRate");
+const handleSuccess = require("./handle/handleSuccess");
 const telegramPermissionService = require("../service/permission/telegramPremissionService");
 
 const clients = [];
@@ -124,11 +126,27 @@ async function handleEvent(client, event) {
         return;
       }
 
+      if (message.message === "/successrate1") {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleSuccess(client, chatId);
+        });
+        return;
+      }
+
+      if (message.message === "successrate2") {
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleRate(client, chatId);
+        });
+        return;
+      }
+
       if (message.message.startsWith("/")) {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleOrder.requestUrl(message.message, client, chatId);
         });
       }
+
+
     }
   }
 
