@@ -1,15 +1,9 @@
-// 依赖：node-fetch@2、chartjs-node-canvas
-const fetch = require('node-fetch');
-const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+// handle/handleSuccess.js
+const axios = require('axios');
 
-// 只取这两组
-const TARGET_MIDS = [
-  'M658177096879942572',
-];
-
+const TARGET_MID = 'M658177096879942572'; // 固定只统计这个商户
 const API_URL = 'https://bi.humideah.com/bi/sys/stats/merchant';
 
-// 按你给的 header（服务端 fetch 不受 CORS 限制，但保留 UA/Referer 等以防后端校验）
 const API_HEADERS = {
   'accept': 'application/json, text/plain, */*',
   'accept-language': 'en,zh-CN;q=0.9,zh;q=0.8,en-US;q=0.7,zh-TW;q=0.6',
@@ -25,83 +19,79 @@ const API_HEADERS = {
   'sec-fetch-mode': 'cors',
   'sec-fetch-site': 'same-site',
   'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
+  // 如果需要鉴权：在这里追加 Cookie 或 Authorization
 };
 
-function nameMap(merchantOption) {
-  const m = {};
-  merchantOption.forEach(([id, name]) => (m[id] = name));
-  return m;
-}
-
 async function fetchMerchantStats() {
-  const res = await fetch(API_URL, { headers: API_HEADERS });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const res = await axios.get(API_URL, { headers: API_HEADERS });
+  return res.data;
 }
 
-// 画「订单数、成功数（柱）」+「成功率（折线）」双轴图
-async function renderComboChart({ labels, orders, success, rate, title }) {
-  const width = 1200, height = 620;
-  const canvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
-
-  const cfg = {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { type: 'bar', label: '订单笔数', data: orders, yAxisID: 'y', borderWidth: 1 },
-        { type: 'bar', label: '成功笔数', data: success, yAxisID: 'y', borderWidth: 1 },
-        { type: 'line', label: '成功率', data: rate, yAxisID: 'y1', tension: 0.3, pointRadius: 3 }
-      ]
-    },
-    options: {
-      responsive: false,
-      plugins: {
-        title: { display: true, text: title },
-        legend: { display: true }
-      },
-      scales: {
-        y: { beginAtZero: true, title: { display: true, text: '笔数' }, grid: { drawOnChartArea: true } },
-        y1: {
-          beginAtZero: true, max: 100, position: 'right',
-          title: { display: true, text: '成功率 %' },
-          ticks: { callback: v => `${v} %` },
-          grid: { drawOnChartArea: false }
-        }
-      },
-      interaction: { mode: 'index', intersect: false }
-    }
-  };
-
-  return canvas.renderToBuffer(cfg, 'image/png'); // === Buffer（直接用于 sendFile）
+function clampRate(n) {
+  n = Number(n) || 0;
+  if (n < 0) return 0;
+  if (n > 100) return 100;
+  return n;
 }
 
-// 将接口数据抽出成画图需要的三条序列
-function pickSeriesForMid(apiData, mid) {
-  const labels = apiData.data.merchantStatisticX;                // ['14:47', ...] 最近十分钟
-  const triple = apiData.data.merchantStatistic[mid];            // [orders[], success[], rate[]]
-  if (!triple || triple.length < 3) throw new Error(`商户 ${mid} 数据结构不完整`);
-  const orders  = triple[0] || [];
-  const success = triple[1] || [];
-  const rate    = triple[2] || []; // 已是 0~100
-  return { labels, orders, success, rate };
+function formatPct(n) {
+  return `${(Number(n) || 0).toFixed(2)}%`;
 }
 
-// ===== 在你的消息处理里加一个命令：/successrate =====
-async function handleSuccessRateCommand(client, chatId) {
-  // 提示中间态
-  await client.sendMessage(chatId, { message: '⏳ 统计中，正在生成图表…' });
+function buildTextReport(json, mid) {
+  let labels  = json?.data?.merchantStatisticX || [];
+  const triple  = json?.data?.merchantStatistic?.[mid];
+  const nameMap = Object.fromEntries((json?.data?.merchantOption || []).map(([id, n]) => [id, n]));
+  const title   = nameMap[mid] || mid;
 
-  const json = await fetchMerchantStats();
-  const names = nameMap(json.data.merchantOption);
+  if (!Array.isArray(triple) || triple.length < 3) {
+    throw new Error(`商户 ${mid} 数据结构不完整`);
+  }
+  let orders  = Array.isArray(triple[0]) ? triple[0] : [];
+  let success = Array.isArray(triple[1]) ? triple[1] : [];
+  let rateArr = Array.isArray(triple[2]) ? triple[2] : [];
 
-  for (const mid of TARGET_MIDS) {
-    const { labels, orders, success, rate } = pickSeriesForMid(json, mid);
-    const title = `${names[mid] || mid} ｜ ${labels[0]} ~ ${labels[labels.length - 1]}`;
-    const png = await renderComboChart({ labels, orders, success, rate, title });
+  const len = Math.min(labels.length, orders.length, success.length, rateArr.length);
+  labels  = labels.slice(-len);
+  orders  = orders.slice(-len);
+  success = success.slice(-len);
+  rateArr = rateArr.slice(-len);
 
-    // Buffer 直接上传 + 发送
-    const uploaded = await client.uploadFile({ file: { buffer: png, name: `${mid}.png` } });
-    await client.sendFile(chatId, { file: uploaded, caption: `📊 ${names[mid] || mid}` });
+  const lines = [];
+  lines.push(`📈 ${title}（过去 ${len} 分钟代收）`);
+  lines.push('');
+
+  for (let i = 0; i < len; i++) {
+    const t   = labels[i];
+    const o   = Number(orders[i])  || 0;
+    const s   = Number(success[i]) || 0;
+    const r   = clampRate(rateArr[i]);
+    lines.push(`${t}  订单:${o}  成功:${s}`);
+    lines.push(`成功率:${formatPct(r)}`);
+  }
+
+  const totalOrders  = orders.reduce((a, b) => a + (Number(b) || 0), 0);
+  const totalSuccess = success.reduce((a, b) => a + (Number(b) || 0), 0);
+  const avgRate      = rateArr.reduce((a, b) => a + (Number(b) || 0), 0) / (len || 1);
+
+  lines.push('');
+  lines.push('——— 汇总数据 ———');
+  lines.push(`总订单: ${totalOrders}`);
+  lines.push(`总成功: ${totalSuccess}`);
+  lines.push(`平均成功率: ${formatPct(avgRate)}`);
+
+  return lines.join('\n');
+}
+
+async function requestUrl(client, chatId) {
+  try {
+    const json = await fetchMerchantStats();
+    const text = buildTextReport(json, TARGET_MID);
+    await client.sendMessage(chatId, { message: text });
+  } catch (err) {
+    console.error('[handleSuccess text report] failed:', err);
+    await client.sendMessage(chatId, { message: `❌ 生成失败：${err.message || err}` });
   }
 }
+
+module.exports = { requestUrl };

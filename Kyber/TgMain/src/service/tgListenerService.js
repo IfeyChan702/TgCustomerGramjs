@@ -131,16 +131,20 @@ async function handleEvent(client, event) {
         return;
       }
 
-      if (message.message === "/successrate1") {
+      if (message.message.startsWith("/successgpt")) {
+        const minutes = parseInt(message.message.replace("/successgpt", ""), 10) || 10;
+
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleSuccess(client, chatId);
+          await handleSuccess.requestUrl(client, chatId, minutes);
         });
         return;
       }
 
-      if (message.message === "successrate2") {
+      if (message.message.startsWith("/successgpr")) {
+        const minutes = parseInt(message.message.replace("/successgpr", ""), 10) || 10;
+
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleRate(client, chatId);
+          await handleRate.requestUrl(client, chatId, minutes);
         });
         return;
       }
