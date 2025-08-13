@@ -8,7 +8,7 @@ dotenv.config({ path: envPath });
 
 const app = require('./app');
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8087;
 app.listen(PORT, () => {
   console.log(`后端服务已启动：http://localhost:${PORT}`);
 });
