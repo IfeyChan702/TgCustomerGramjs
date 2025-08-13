@@ -10,7 +10,7 @@ router.get("/tg/command", async (req, res) => {
   const {
     method = null,
     identifier = null,
-    keyword = '',
+    keyword = "",
     page = 1,
     size = 10
   } = req.query;
@@ -25,17 +25,17 @@ router.get("/tg/command", async (req, res) => {
 
   try {
     const result = await tgCommandListService.getPageCommands(params);
-    res.json(success(result))
-  }catch (err){
-    console.error(`[ERROR] 查询tg_command_list失败:`,err);
-    res.json(fail(`操作故障，查询失败`))
+    res.json(success(result));
+  } catch (err) {
+    console.error(`[ERROR] 查询tg_command_list失败:`, err);
+    res.json(fail(`操作故障，查询失败`));
   }
 });
 /**
  * 插入
  */
 router.post("/tg/command", async (req, res) => {
-  const { identifier, url, method, description } = req.body;
+  const { identifier, url, method, description, allowAll } = req.body;
 
   if (!identifier || identifier.trim() === "") {
     return res.json(fail("identifier 不能为空"));
@@ -51,6 +51,8 @@ router.post("/tg/command", async (req, res) => {
   const finalUrl = url.trim();
   const finalMethod = method.trim();
   const finalDescription = description ? description.trim() : "";
+  const finalAllowAll = allowAll === true || allowAll === 1 || allowAll === "1" || allowAll === "true" ? 1 : 0;
+
 
   try {
     const exists = await tgCommandListService.queryCommandByIdentifierAndMethod(finalIdentifier, finalMethod);
@@ -62,7 +64,8 @@ router.post("/tg/command", async (req, res) => {
       identifier: finalIdentifier,
       url: finalUrl,
       method: finalMethod,
-      description: finalDescription
+      description: finalDescription,
+      allowAll: finalAllowAll
     });
 
     if (result.affectedRows === 1) {
@@ -75,12 +78,13 @@ router.post("/tg/command", async (req, res) => {
     res.json(fail("系统繁忙，新增失败"));
   }
 });
+
 /**
  * 修改的代码
  */
 router.put("/tg/command/:id", async (req, res) => {
   const { id } = req.params;
-  const { identifier, url, method, description } = req.body;
+  const { identifier, url, method, description, allowAll } = req.body;
 
   // 参数校验
   if (!id || isNaN(parseInt(id))) {
@@ -104,6 +108,7 @@ router.put("/tg/command/:id", async (req, res) => {
   const finalUrl = url.trim();
   const finalMethod = method.trim();
   const finalDesc = description ? description.trim() : "";
+  const finalAllowAll = allowAll === 1 || allowAll === "1" || allowAll === true ? 1 : 0;
 
   try {
     const origin = await tgCommandListService.queryCommandById(commandId);
@@ -120,7 +125,8 @@ router.put("/tg/command/:id", async (req, res) => {
       finalIdentifier === origin.identifier &&
       finalUrl === origin.url &&
       finalMethod === origin.method &&
-      finalDesc === (origin.description || "");
+      finalDesc === (origin.description || "") &&
+      finalAllowAll === (origin.allow_all || 0);
 
     if (isUnchanged) {
       return res.json(fail("内容未发生变化，无需修改"));
@@ -131,7 +137,8 @@ router.put("/tg/command/:id", async (req, res) => {
       finalIdentifier,
       finalUrl,
       finalMethod,
-      finalDesc
+      finalDesc,
+      finalAllowAll
     );
 
     if (result.affectedRows === 1) {

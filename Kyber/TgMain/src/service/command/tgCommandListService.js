@@ -38,7 +38,7 @@ exports.getPageCommands = (params = {}) => {
     }
 
     const countSQL = `SELECT COUNT(*) AS total ` + baseSQL;
-    const dataSQL = `SELECT id,identifier,url,method,description ` + baseSQL + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+    const dataSQL = `SELECT id,identifier,url,method,description,allow_all ` + baseSQL + ` ORDER BY id DESC LIMIT ? OFFSET ?`;
 
     values.push(size, offset);
 
@@ -65,7 +65,10 @@ exports.getPageCommands = (params = {}) => {
  * @return {Promise<unknown>}
  */
 exports.queryCommandByIdentifierAndMethod = (identifier, method) => {
-  const sql = `SELECT * FROM tg_command_list WHERE identifier = ? AND method = ? LIMIT 1`;
+  const sql = `SELECT *
+               FROM tg_command_list
+               WHERE identifier = ?
+                 AND method = ? LIMIT 1`;
 
   return new Promise((resolve, reject) => {
     db.query(sql, [identifier, method], (err, result) => {
@@ -80,16 +83,16 @@ exports.queryCommandByIdentifierAndMethod = (identifier, method) => {
  * @param url
  * @param method
  * @param description
+ * @param allowAll
  * @return {Promise<unknown>}
  */
-exports.insertCommand = ({ identifier, url, method, description }) => {
+exports.insertCommand = ({ identifier, url, method, description, allowAll }) => {
   const sql = `
-    INSERT INTO tg_command_list (identifier, url, method, description)
-    VALUES (?, ?, ?, ?)
+      INSERT INTO tg_command_list (identifier, url, method, description, allow_all)
+      VALUES (?, ?, ?, ?, ?)
   `;
-
   return new Promise((resolve, reject) => {
-    db.query(sql, [identifier, url, method, description], (err, result) => {
+    db.query(sql, [identifier, url, method, description, allowAll], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -101,7 +104,9 @@ exports.insertCommand = ({ identifier, url, method, description }) => {
  * @return {Promise<unknown>}
  */
 exports.queryCommandById = (id) => {
-  const sql = `SELECT * FROM tg_command_list WHERE id = ?`;
+  const sql = `SELECT *
+               FROM tg_command_list
+               WHERE id = ?`;
   return new Promise((resolve, reject) => {
     db.query(sql, [id], (err, result) => {
       if (err) return reject(err);
@@ -116,7 +121,9 @@ exports.queryCommandById = (id) => {
  * @return {Promise<unknown>}
  */
 exports.queryByIdentifier = (identifier) => {
-  const sql = `SELECT * FROM tg_command_list WHERE identifier = ? LIMIT 1`;
+  const sql = `SELECT *
+               FROM tg_command_list
+               WHERE identifier = ? LIMIT 1`;
   return new Promise((resolve, reject) => {
     db.query(sql, [identifier], (err, result) => {
       if (err) return reject(err);
@@ -134,14 +141,18 @@ exports.queryByIdentifier = (identifier) => {
  * @param description
  * @return {Promise<unknown>}
  */
-exports.updateCommandById = (id, identifier, url, method, description) => {
+exports.updateCommandById = (id, identifier, url, method, description, allowAll) => {
   const sql = `
-    UPDATE tg_command_list
-    SET identifier = ?, url = ?, method = ?, description = ?
-    WHERE id = ?
+      UPDATE tg_command_list
+      SET identifier  = ?,
+          url         = ?,
+          method      = ?,
+          description = ?,
+          allow_all   = ?
+      WHERE id = ?
   `;
   return new Promise((resolve, reject) => {
-    db.query(sql, [identifier, url, method, description, id], (err, result) => {
+    db.query(sql, [identifier, url, method, description, allowAll, id], (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -153,7 +164,9 @@ exports.updateCommandById = (id, identifier, url, method, description) => {
  * @return {Promise<unknown>}
  */
 exports.deleteCommandById = (id) => {
-  const sql = `DELETE FROM tg_command_list WHERE id = ?`;
+  const sql = `DELETE
+               FROM tg_command_list
+               WHERE id = ?`;
   return new Promise((resolve, reject) => {
     db.query(sql, [id], (err, result) => {
       if (err) return reject(err);

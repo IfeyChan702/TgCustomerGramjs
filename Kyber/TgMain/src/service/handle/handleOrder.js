@@ -2,25 +2,16 @@ const tgDbService = require("../tgDbService");
 const axios = require("axios");
 /**
  * 处理命令型的请求
+ * @param command
+ * @param userArgs
  * @param inputCommand
  * @param client
  * @param chatId
  * @return {Promise<void>}
  */
-async function requestUrl(inputCommand, client, chatId) {
+async function requestUrl(command,userArgs,inputCommand, client, chatId) {
 
   try {
-    const parts = inputCommand.trim().split(/\s+/);
-    const identifier = parts[0].replace("/", "");
-    const userArgs = parts.slice(1);
-
-    const commandList = await tgDbService.getCommandByIdentifier(identifier);
-    const command = commandList[0];
-    if (!command) {
-      await client.sendMessage(chatId, { message: `❌ 未知命令：/${identifier}` });
-      return;
-    }
-
     const params = await tgDbService.getParamsByCommandId(command.id);
 
     // 检查必填参数数量是否足够
