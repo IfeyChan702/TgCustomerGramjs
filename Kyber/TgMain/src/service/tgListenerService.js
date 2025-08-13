@@ -166,10 +166,10 @@ async function handleEvent(client, event) {
       return;
     }
 
-    if (message.message.startsWith("/")) {
+    if (message.message.startsWith("/hello_")) {
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         const parts = message.message.trim().split(/\s+/);
-        const identifier = parts[0].replace("/", "");
+        const identifier = parts[0].replace("/hello_", "");
         const userArgs = parts.slice(1);
         const command = await tgDbService.getCommandByIdentifier(identifier);
         if (!command) {
