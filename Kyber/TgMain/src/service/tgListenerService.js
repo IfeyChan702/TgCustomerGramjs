@@ -6,11 +6,19 @@ const tgDbService = require("./tgDbService");
 const { getOrRunMessageResponse } = require("../utils/lockUtil");
 const { redis } = require("../models/redisModel");
 const handleOrder = require("./handle/handleOrder");
+const handleRate = require("./handle/handleRate");
+const handleSuccess = require("./handle/handleSuccess");
 const telegramPermissionService = require("../service/permission/telegramPremissionService");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
 const orderChatId = -4856325360;//线上的命令群
+// 允许使用 success 命令的群
+const ALLOWED_SUCCESS_CHAT_IDS = new Set([
+  '-4750453063',
+  '-977169962',
+  '-1001583412817'
+]);
 
 // 启动所有账户监听
 async function startOrderListener() {
@@ -129,6 +137,35 @@ async function handleEvent(client, event) {
         return;
       }
     }
+
+    if (message.message.startsWith("/success1")) {
+      // 群校验
+      if (!ALLOWED_SUCCESS_CHAT_IDS.has(String(chatId))) {
+        await client.sendMessage(chatId, { message: "❌ 本群无权使用 /success1" });
+        return;
+      }
+
+      const minutes = parseInt(message.message.replace("/success1", ""), 10) || 10;
+      await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+        await handleSuccess.requestUrl(client, chatId, minutes);
+      });
+      return;
+    }
+
+    if (message.message.startsWith("/success2")) {
+      // 群校验
+      if (!ALLOWED_SUCCESS_CHAT_IDS.has(String(chatId))) {
+        await client.sendMessage(chatId, { message: "❌ 本群无权使用 /success2" });
+        return;
+      }
+
+      const minutes = parseInt(message.message.replace("/success2", ""), 10) || 10;
+      await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+        await handleRate.requestUrl(client, chatId, minutes);
+      });
+      return;
+    }
+
     if (message.message.startsWith("/")) {
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         const parts = message.message.trim().split(/\s+/);
