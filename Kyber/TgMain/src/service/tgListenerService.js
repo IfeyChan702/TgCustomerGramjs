@@ -166,15 +166,14 @@ async function handleEvent(client, event) {
       return;
     }
 
-    if (message.message.startsWith("/hello_")) {
+    if (message.message.startsWith("/")) {
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         const parts = message.message.trim().split(/\s+/);
-        const identifier = parts[0].replace("/hello_", "");
+        const identifier = parts[0].replace("/", "");
         const userArgs = parts.slice(1);
         const command = await tgDbService.getCommandByIdentifier(identifier);
         if (!command) {
           console.warn(`命令${message.message} 不存在`);
-          await client.sendMessage(chatId, { message: `❌ 未知命令：${message.message}` });
           return false;
         }
         if (await isAuthorized(command,chatId)) {
