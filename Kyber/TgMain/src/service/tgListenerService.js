@@ -100,6 +100,12 @@ async function handleEvent(client, event) {
       }
     }
 
+    if (message.message === "/hello_chatId") {
+      await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+        await handleChatIdOrder(client, chatId, message, chatTitle, chat);
+      });
+      return;
+    }
 
     if (chatId === ErrorGroupChatID) {
       if (message.message === "/start") {
@@ -126,13 +132,6 @@ async function handleEvent(client, event) {
       if (message.message.startsWith("/stop_")) {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleStopOrderByID(client, chatId, message);
-        });
-        return;
-      }
-
-      if (message.message === "/chatId") {
-        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
-          await handleChatIdOrder(client, chatId, message, chatTitle, chat);
         });
         return;
       }
