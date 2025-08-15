@@ -91,7 +91,7 @@ router.post("/tg/command/group/permission", async (req, res) => {
 
   } catch (err) {
     console.error(`[ERROR] 新增 tg_command_group_permission 失败:`, err);
-    return res.json(fail(err.message || "操作故障，新增失败"));
+    return res.json(fail("操作故障，新增失败"));
   }
 });
 
@@ -100,7 +100,8 @@ router.post("/tg/command/group/permission", async (req, res) => {
  */
 router.put("/tg/command/group/permission/:id", async (req, res) => {
 
-  const { id, groupId, status, groupName, remark } = req.body;
+  const { id } = req.params;
+  const { groupId, status, groupName, remark } = req.body;
 
   if (!id || isNaN(parseInt(id))) {
     return res.json(fail("id不能为空且必须为数字"));
@@ -115,20 +116,37 @@ router.put("/tg/command/group/permission/:id", async (req, res) => {
       remark
     });
 
-    if (result.affectedRows === 0){
-      return res.json(fail("未找到对应记录或者没有修改!"))
+    if (result.affectedRows === 0) {
+      return res.json(fail("未找到对应记录或者没有修改!"));
     }
     res.json(success("更新成功"));
   } catch (err) {
-    console.error(`[ERROR]更新 tg_command_group_permission失败:`,err);
+    console.error(`[ERROR]更新 tg_command_group_permission失败:`, err);
     res.json(fail("操作故障，更新失败"));
   }
 });
 /**
- * 删除
+ * 根据id删除信息
  */
 router.delete("/tg/command/group/permission/:id", async (req, res) => {
+  const { id } = req.params;
 
+  if (!id || isNaN(id)) {
+    return res.json(fail("id不能为空且必须为数字"));
+  }
+
+  try {
+    const result = await tgComGroPeService.deleteById(parseInt(id));
+
+    if (result.affectedRows === 0){
+      return res.json(fail("未找到对应记录"));
+    }
+
+    res.json(success("删除成功"));
+  }catch (err){
+    console.error(`[ERROR]删除tg_command_group_permission失败:`,err);
+    res.json("操作故障，删除失败");
+  }
 });
 
 module.exports = router;

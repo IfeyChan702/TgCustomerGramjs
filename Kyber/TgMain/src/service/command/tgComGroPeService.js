@@ -61,13 +61,19 @@ exports.getPageCommandPermissions = async ({ commandId, keyword, status, offset,
  * @return {Promise<void>}
  */
 exports.getCommandPerByCommandIdAndGroupId = async (commandId, groupId) => {
-  const sql = `
-      SELECT id
-      FROM tg_command_group_permission
-      WHERE command_id = ?
-        AND group_id = ? LIMIT 1
-  `;
-  return db.query(sql, [commandId, groupId]);
+
+  return new Promise((resolve, reject) => {
+    const sql = `
+        SELECT id
+        FROM tg_command_group_permission
+        WHERE command_id = ?
+          AND group_id = ? LIMIT 1
+    `;
+    db.query(sql, [commandId, groupId], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
 };
 /**
  * 插入数据
@@ -84,7 +90,12 @@ exports.insertCommandPermissions = async ({ commandId, groupId, status, groupNam
           (command_id, group_id, group_name, status, remark, create_time)
       VALUES (?, ?, ?, ?, ?, NOW())
   `;
-  return db.query(sql, [commandId, groupId, groupName, status, remark]);
+  return new Promise((resolve, reject) => {
+    db.query(sql, [commandId, groupId, groupName, status, remark], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
 };
 /**
  * 修改数据
@@ -131,10 +142,30 @@ exports.updateCommandPermission = async ({ id, groupId, status, groupName, remar
   }
 
   const sql = `UPDATE tg_command_group_permission
-               SET ${fields.join(",")},
-                   update_time = NOW()
+               SET ${fields.join(",")}
                WHERE id = ?`;
   params.push(id);
 
-  return db.query(sql,params);
+  return new Promise((resolve, reject) => {
+    db.query(sql, params, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+/**
+ * 根据id删除信息
+ * @param id
+ * @return {Promise<*>}
+ */
+exports.deleteById = async (id) => {
+  const sql = `DELETE
+               FROM tg_command_group_permission
+               WHERE id = ?`;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [id], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
 };
