@@ -12,9 +12,7 @@ const { rejects } = require("node:assert");
  */
 exports.getPageCommandPermissions = async ({ commandId, keyword, status, offset, limit }) => {
 
-  const params = [];
-
-  params.push(commandId);
+  const params = [commandId];
 
   let baseSql = ` FROM tg_command_group_permission WHERE command_id = ?`;
 
@@ -35,24 +33,27 @@ exports.getPageCommandPermissions = async ({ commandId, keyword, status, offset,
     ORDER BY create_time DESC
     LIMIT ?, ?
   `;
-
   const countSql = `SELECT COUNT(*) AS total ${baseSql}`;
 
-  try {
-    const countResult = await db.query(countSql, params);
-    const total = countResult[0]?.total || 0;
-    const dataResult = await db.query(dataSql, [...params, offset, limit]);
+  // 这里只返回一个 Promise，把两次查询都放进来
+  return new Promise((resolve, reject) => {
+    db.query(countSql, params, (err, countRows) => {
+      if (err) return reject(err);
 
-    return {
-      list: dataResult,
-      total,
-      page: Math.floor(offset / limit) + 1,
-      pageSize: limit
-    };
+      const total = countRows?.[0]?.total ?? 0;
 
-  } catch (err) {
-    throw err;
-  }
+      db.query(dataSql, [...params, offset, limit], (err2, dataRows) => {
+        if (err2) return reject(err2);
+
+        resolve({
+          list: dataRows,
+          total,
+          page: Math.floor(offset / limit) + 1,
+          pageSize: limit
+        });
+      });
+    });
+  });
 };
 /**
  * 根据commandId和groupId查询
