@@ -188,6 +188,7 @@ router.delete("/project/data/:id", async (req, res) => {
  * 接口给一个key+projectId获得value
  */
 router.get("/project/data/value", async (req, res) => {
+
   const { projectId, key = "" } = req.query;
 
   if (!projectId || isNaN(parseInt(projectId))) {

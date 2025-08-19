@@ -139,6 +139,7 @@ exports.queryByIdentifier = (identifier) => {
  * @param url
  * @param method
  * @param description
+ * @param allowAll
  * @return {Promise<unknown>}
  */
 exports.updateCommandById = (id, identifier, url, method, description, allowAll) => {
