@@ -50,7 +50,7 @@ router.get('/currentUser', authController.getCurrentUser);
  *       200:
  *         description: 规则列表
  */
-router.get('/rule', authController.getRules);
+// router.get('/rule', authController.getRules);
 
 /**
  * @swagger
@@ -77,5 +77,7 @@ router.post('/login/outLogin', authController.logout);
  *         description: 返回验证码图片或内容
  */
 router.get('/captcha', authController.getCaptcha);
+
+router.post('/refresh', authController.refresh);
 
 module.exports = router;
