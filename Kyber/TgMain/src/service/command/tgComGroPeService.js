@@ -28,7 +28,7 @@ exports.getPageCommandPermissions = async ({ commandId, keyword, status, offset,
   }
 
   const dataSql = `
-    SELECT group_id, group_name, status, remark, create_time
+    SELECT id,group_id, group_name, status, remark, create_time
     ${baseSql}
     ORDER BY create_time DESC
     LIMIT ?, ?
