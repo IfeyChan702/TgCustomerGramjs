@@ -1,3 +1,6 @@
+nvm install v22.11.0 
+nvm use 22.11.0
+
 git clone https://github.com/IfeyChan702/TgCustomerGramjs.git
 ## 项目放在这个文件下面
 /opt/ifey/tg-node-service
