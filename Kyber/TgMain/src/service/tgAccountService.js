@@ -1,4 +1,4 @@
-const { stopListener, startListener } = require("./tgListenerService");
+const { stopListener, startListener } = require("./tgMessage/tgListenerService");
 const db = require("../models/mysqlModel");
 const telegramPermissionService = require("../service/permission/telegramPremissionService");
 const { getRawAsset } = require("node:sea");
