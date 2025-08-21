@@ -78,3 +78,14 @@ exports.deleteChannel = (id) => {
     });
   });
 };
+
+//查询全部的渠道id,渠道名称,渠道id
+exports.getAllChannelForSelect = () => {
+  return new Promise((resolve,reject) => {
+    const sql = 'SELECT id,group_id,group_name id FROM tg_groups_channel'
+    db.query(sql,[],(err,results) => {
+      if (err) return reject(err);
+      resolve(results)
+    })
+  });
+}

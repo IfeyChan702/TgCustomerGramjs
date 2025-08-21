@@ -7,7 +7,7 @@ redis.on('error', (err) => console.error('Redis Client Error', err));
 
 async function startRedis() {
   await redis.connect();
-  console.log('Connected to Redis');
+  console.log('Connected to Redis：='+process.env.REDIS_HOST);
 }
 
 

@@ -7,8 +7,8 @@ exports.getAllMerchants = (keyword = '') => {
     const values = [];
 
     if (keyword) {
-      sql += ' WHERE group_name LIKE ? OR tg_account_id LIKE ?';
-      values.push(`%${keyword}%`);
+      sql += ' WHERE group_name LIKE ? OR chat_id LIKE ? OR tg_account_id LIKE ?';
+      values.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
     }
 
     db.query(sql, values, (err, results) => {
@@ -73,3 +73,14 @@ exports.deleteMerchant = (id) => {
     });
   });
 };
+
+//查询全部的商户id和商户名称
+exports.getAllMerchantForSelect = () => {
+  return new Promise((resolve,reject) => {
+    const sql = 'SELECT id,chat_id,group_name FROM tg_groups_merchant'
+    db.query(sql,[],(err,results) => {
+      if (err) return reject(err);
+      resolve(results);
+    })
+  })
+}
