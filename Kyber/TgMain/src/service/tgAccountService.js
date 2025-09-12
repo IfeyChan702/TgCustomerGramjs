@@ -130,7 +130,7 @@ exports.updateAccount = async (registerId, account) => {
           if (Number(account.is_running) === 0) {
             await stopListener(Id);
             console.log(`[监听] 已关闭: ${registerId}`);
-          } else if (Number(account.is_running) === 1) {
+          } else if (Number(account.is_running) === 1 ||Number(account.is_running) === 2) {
             if (user.api_id && user.api_hash && user.session) {
               await startListener(Id);
               console.log(`[监听] 已开启: ${registerId}`);

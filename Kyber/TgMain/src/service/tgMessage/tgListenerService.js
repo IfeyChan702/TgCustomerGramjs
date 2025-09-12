@@ -8,16 +8,16 @@ const { redis } = require("../../models/redisModel");
 const handleOrder = require("../handle/handleOrder");
 const handleRate = require("../handle/handleRate");
 const handleSuccess = require("../handle/handleSuccess");
-const telegramPermissionService = require("../permission/telegramPremissionService");
+const tgMsgHandle = require("../tgMessage/tgMsgHandService")
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
 const orderChatId = -4856325360;//线上的命令群
 // 允许使用 success 命令的群
 const ALLOWED_SUCCESS_CHAT_IDS = new Set([
-  '-4750453063',
-  '-977169962',
-  '-1001583412817'
+  "-4750453063",
+  "-977169962",
+  "-1001583412817"
 ]);
 
 // 启动所有账户监听
@@ -40,7 +40,7 @@ async function startOrderListener() {
     );
     await client.connect();
     console.log(`[INFO] Client connected: ${acc.api_id}`);
-    setupEventHandlers(client);
+    setupEventHandlers(client, acc.is_running);
     // 防止进程自动退出
     setInterval(() => {
     }, 100000);
@@ -52,17 +52,17 @@ async function startOrderListener() {
 startOrderListener().catch(console.error);
 
 // ================= 监听事件主逻辑 ===================
-function setupEventHandlers(client) {
+function setupEventHandlers(client, isRunning) {
   client.addEventHandler(async (event) => {
     try {
-      await handleEvent(client, event);
+      await handleEvent(client, event, isRunning);
     } catch (e) {
       console.error("[EventHandler Error]", e);
     }
   }, new NewMessage({}));
 }
 
-async function handleEvent(client, event) {
+async function handleEvent(client, event, isRunning) {
   const chatId = event.chatId?.valueOf();
   const chat = await client.getEntity(chatId);
   const chatTitle = chat.title;
@@ -72,6 +72,11 @@ async function handleEvent(client, event) {
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
   const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
+
+  if (2 === isNaN(isRunning)){
+    await tgMsgHandle.recMsg(client, event);
+    return;
+  }
 
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
@@ -175,8 +180,8 @@ async function handleEvent(client, event) {
           console.warn(`命令${message.message} 不存在`);
           return false;
         }
-        if (await isAuthorized(command,chatId)) {
-          await handleOrder.requestUrl(command,userArgs,message.message, client, chatId);
+        if (await isAuthorized(command, chatId)) {
+          await handleOrder.requestUrl(command, userArgs, message.message, client, chatId);
         }
       });
     }
@@ -377,7 +382,7 @@ async function startListener(id) {
   );
   await client.connect();
   console.log(`用户连接成功: ${data.api_id}`);
-  setupEventHandlers(client);
+  setupEventHandlers(client, data.is_running);
   clients.push({ id: data.Id, client });
 }
 
@@ -397,10 +402,10 @@ function removeClientById(id) {
  * @param chatId
  * @returns {*}
  */
-async function isAuthorized(command,chatId) {
+async function isAuthorized(command, chatId) {
   try {
 
-    if (command.allow_all === 1){
+    if (command.allow_all === 1) {
       return true;
     }
 
