@@ -3,7 +3,7 @@ const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 const axios = require("axios");
 const tgDbService = require("../tgDbService");
-const { getOrRunMessageResponse } = require("../../utils/lockUtil");
+const { getOrRunMessageResponse,onceByKey } = require("../../utils/lockUtil");
 const { redis } = require("../../models/redisModel");
 const handleOrder = require("../handle/handleOrder");
 const handleRate = require("../handle/handleRate");
@@ -73,7 +73,8 @@ async function handleEvent(client, event, isRunning) {
   const senderTelegramID = String(sender);
   const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
 
-  if (2 === isNaN(isRunning)){
+  //TODO 逻辑可能有问题
+  if (2 === isRunning){
     await tgMsgHandle.recMsg(client, event);
     return;
   }
@@ -216,13 +217,17 @@ async function handleEvent(client, event, isRunning) {
     message.message.trim().length > 0 &&
     orderRegex.test(message.message)
   ) {
-    await handleMerchantOrderMessage(client, chatId, message);
+    await getOrRunMessageResponse(redis, chatId, message.id, 60, async () => { // 60秒足够
+      await handleMerchantOrderMessage(client, chatId, message);
+    });
     return;
   }
 
   // ----------- 4. 渠道群回复监听，转发回商户群 -----------
   if (message.replyTo && message.replyTo.replyToMsgId) {
-    await handleChannelReply(client, chatId, chatTitle, message);
+    await getOrRunMessageResponse(redis, chatId, message.id, 60, async () => {
+      await handleChannelReply(client, chatId, chatTitle, message);
+    });
     return;
   }
 }
@@ -278,6 +283,13 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 
   if (!sourceGroupIds.has(String(chatId)) || !relevantAccountIds.has(accountIdFromClient)) return;
 
+  const srcKey = `srcfwd:${chatId}:${message.id}`;
+  const isFirstForSource = await onceByKey(redis, srcKey, 0);
+  if (!isFirstForSource) {
+    // 这条来源消息以前转发过了，直接跳过（哪怕过去一个月）
+    return;
+  }
+
   await client.sendMessage(chatId, {
     message: "客户请等待，现在为你查询订单",
     replyTo: message.id
@@ -295,7 +307,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 
     if (!targetChatIds.length) {
       await client.sendMessage(orderChatId, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
-      const errorSentMsg = await client.sendFile(orderId, {
+      const errorSentMsg = await client.sendFile(orderChatId, {
         file: message.media,
         caption: `${merchantOrderId}`
       });
@@ -325,6 +337,9 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 
 // ========== 渠道群回复监听 → 回转商户群 ============
 async function handleChannelReply(client, chatId, chatTitle, message) {
+  const replyKey = `replyfwd:${chatId}:${message.id}`;
+  const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 90);
+  if (!ok) return;
   const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
   if (!channelGroupIds.has(String(chatId))) return;
 
@@ -562,7 +577,7 @@ async function handleStartOrderByID(client, chatId, message) {
   try {
     const parts = message.message?.split("_");
     if (!parts || parts.length < 2) {
-      return client.SendMessage(chatId, {
+      return client.sendMessage(chatId, {
         message: `开启用户指令错误,"/start_"+用户id`
       });
     }
@@ -570,12 +585,12 @@ async function handleStartOrderByID(client, chatId, message) {
     if (await tgDbService.isAccountExistsWithStatus(accId, 0)) {
       await tgDbService.updateRunningByAccId(accId, 1);
       await startListener(accId);
-      client.SendMessage(chatId, {
+      client.sendMessage(chatId, {
         message: `开启成功，用户${accId}成功开启`
       });
       return;
     }
-    client.SendMessage(chatId, {
+    client.sendMessage(chatId, {
       message: `开启失败，用户${accId}已经是开启状态`
     });
   } catch (e) {
@@ -594,7 +609,7 @@ async function handleStopOrderByID(client, chatId, message) {
   try {
     const parts = message.message?.split("_");
     if (!parts || parts.length < 2) {
-      return client.SendMessage(chatId, {
+      return client.sendMessage(chatId, {
         message: `关闭用户指令错误，应为 "/stop_"+用户id`
       });
     }
@@ -603,14 +618,14 @@ async function handleStopOrderByID(client, chatId, message) {
 
     const isRunning = await tgDbService.isAccountExistsWithStatus(accId, 1);
     if (!isRunning) {
-      return client.SendMessage(chatId, {
+      return client.sendMessage(chatId, {
         message: `⚠️ 用户 ${accId} 当前未运行，无需关闭`
       });
     }
 
     const runningAccounts = await tgDbService.getAccountByIsRunning(1);
     if (runningAccounts.length <= 1) {
-      return client.SendMessage(chatId, {
+      return client.sendMessage(chatId, {
         message: `❌ 只剩下最后一个正在运行的用户，无法关闭`
       });
     }
@@ -618,13 +633,13 @@ async function handleStopOrderByID(client, chatId, message) {
     await tgDbService.updateRunningByAccId(accId, 0);
     await stopListener(accId); // 如果你有 stopListener 函数，这里调用
 
-    return client.SendMessage(chatId, {
+    return client.sendMessage(chatId, {
       message: `✅ 用户 ${accId} 已成功关闭`
     });
 
   } catch (e) {
     console.error(`[ERROR] 关闭用户失败:`, e);
-    return client.SendMessage(chatId, {
+    return client.sendMessage(chatId, {
       message: `系统错误，关闭用户失败：${e.message || e}`
     });
   }
@@ -662,7 +677,7 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
     });
   } catch (e) {
     console.error(`[ERROR] 处理命令"/chatId"故障:`, e);
-    return client.SendMessage(chatId, {
+    return client.sendMessage(chatId, {
       message: `系统错误，"/chatId"命令处理失败`
     });
   }

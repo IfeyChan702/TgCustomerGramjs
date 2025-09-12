@@ -25,5 +25,10 @@ async function getOrRunMessageResponse(redis,chatId,messageId,ttlSeconds=600,fn)
 
 }
 
+async function onceByKey(redis, key, ttlSeconds = 0) {
+  const ok = await redis.set(key, "1", "NX", ...(ttlSeconds > 0 ? ["EX", ttlSeconds] : []));
+  return !!ok;
+}
 
-module.exports = { getOrRunMessageResponse }
+
+module.exports = { getOrRunMessageResponse,onceByKey }
