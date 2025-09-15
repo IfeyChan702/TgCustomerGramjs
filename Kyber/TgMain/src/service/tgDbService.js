@@ -163,7 +163,7 @@ const getLatestRegisterIds = async () => {
       FROM tg_accounts t1
                JOIN (SELECT phone, MAX(created_at) AS latest_created_at
                      FROM tg_accounts
-                     WHERE is_running = 1
+                     WHERE is_running != 0
                      GROUP BY phone) t2 ON t1.phone = t2.phone AND t1.created_at = t2.latest_created_at
   `;
   const results = await queryAsync(sql);
