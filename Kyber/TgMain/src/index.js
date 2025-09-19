@@ -10,10 +10,10 @@ dotenv.config({ path: envPath });
 const app = require("./app");
 const { bot, startBot } = require("./service/system/bot");
 const createWithdrawalsRouter = require("./routes/system/withdrawals");
-
 const PORT = process.env.PORT || 8087;
 
 app.listen(PORT, () => {
+  console.log("111111"+process.env.NODE_ENV)
   console.log(`后端服务已启动：http://localhost:${PORT}`);
 });
 
