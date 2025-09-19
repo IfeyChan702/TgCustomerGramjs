@@ -3,7 +3,7 @@ const dotenv = require("dotenv");
 
 const express = require("express");
 
-const env = process.env.NODE_ENV || "development";
+const env = "production";
 const envPath = path.resolve(__dirname, `../.env.${env}`);
 dotenv.config({ path: envPath });
 
@@ -11,7 +11,7 @@ const app = require("./app");
 
 const { bot, startBot } = require("./service/system/bot");
 const createWithdrawalsRouter = require("./routes/system/withdrawals");
-const PORT = process.env.PORT || 8087;
+const PORT = 8087;
 
 app.use(express.json());
 app.use("/api", createWithdrawalsRouter(bot));
