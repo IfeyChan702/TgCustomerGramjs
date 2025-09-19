@@ -22,12 +22,17 @@ function registerCallbackHandler(bot) {
         return ctx.answerCbQuery("该笔已处理");
       }
 
+      const approver =
+        ctx.from.username ||
+        ctx.from.first_name ||
+        String(ctx.from.id);
+
       if (action === "ok") {
         const got = await tryDecide(orderId);
         if (!got) return ctx.answerCbQuery("该笔已处理");
 
-        const ok = await callbackBackend(orderId, "ok", ctx.from.id);
-        /*if (!ok) return ctx.answerCbQuery("后端失败", { show_alert: true });*/
+        const ok = await callbackBackend(orderId, approver, 3);
+        if (!ok) return ctx.answerCbQuery("后端失败", { show_alert: true });
 
         const ts = new Date().toLocaleString();
         const newText = ctx.callbackQuery.message.text + approvedSuffix(ctx.from.username || ctx.from.first_name, ts);
@@ -39,7 +44,7 @@ function registerCallbackHandler(bot) {
         const got = await tryDecide(orderId);
         if (!got) return ctx.answerCbQuery("该笔已处理");
 
-        const ok = await callbackBackend(orderId, "no", ctx.from.id);
+        const ok = await callbackBackend(orderId, approver, 4);
         /*if (!ok) return ctx.answerCbQuery("后端失败", { show_alert: true });*/
 
         const ts = new Date().toLocaleString();

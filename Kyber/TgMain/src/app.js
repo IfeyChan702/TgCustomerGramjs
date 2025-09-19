@@ -13,7 +13,7 @@ const projectDataRoutes = require("./routes/project/projectDataRoutes");
 const tgParameterListRoutes = require("./routes/command/tgParameterListRoutes");
 const tgCommandListRoutes = require("./routes/command/tgCommandListRoutes");
 const tgComGroPeRoutes = require("./routes/command/tgComGroPeRoutes");
-const sysWithdrawals = require("./routes/system/withdrawals");
+const sysWithdrawals = require("./routes/system/withdrawalsRoutes");
 const { bot } = require("./service/system/bot");
 
 require("./models/mysqlModel");

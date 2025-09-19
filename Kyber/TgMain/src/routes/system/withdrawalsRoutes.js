@@ -25,34 +25,34 @@ module.exports = function createWithdrawalsRouter(bot) {
     .replace(/>/g, "&gt;");
 
   router.post("/withdrawals/create", async (req, res) => {
-    const { merchant_id, order_id, amount, exchange_rate, remark = "", currency } = req.body || {};
+    const { merchantName, orderId, amount, exchangeRate, remark = "", currency } = req.body || {};
     try {
-      if (!merchant_id || !order_id || amount === undefined || exchange_rate === undefined || !currency) {
+      if (!merchantName || !orderId || amount === undefined || exchangeRate === undefined || !currency) {
         return res.json(fail("参数异常"));
       }
 
-      const chatReviewer = await merChatService.getChatIdAndReviewer(merchant_id, "audit");
+      const chatReviewer = await merChatService.getChatIdAndReviewer(merchantName, "audit");
       if (!chatReviewer || !chatReviewer.chatId) {
         return res.json(fail("chatId不存在或者系统没有这个商户标识！"));
       }
 
       const { chatId, reviewerIds } = chatReviewer;
 
-      await setReviewers(String(order_id), reviewerIds || []);
+      await setReviewers(String(orderId), reviewerIds || []);
 
       const text = formatWithdrawCard({
-        orderId: esc(String(order_id)),
+        orderId: esc(String(orderId)),
         amount: esc(String(amount)),
-        exchangeRate: esc(String(exchange_rate)),
+        exchangeRate: esc(String(exchangeRate)),
         remark: esc(String(remark || "")),
-        merchantId: esc(String(merchant_id)),
+        merchantId: esc(String(merchantName)),
         currency: esc(String(currency)),
       });
 
       await bot.telegram.sendMessage(
         chatId,
         text,
-        { parse_mode: "HTML", ...approveKeyboard(String(order_id), String(merchant_id)) }
+        { parse_mode: "HTML", ...approveKeyboard(String(orderId), String(merchantName)) }
       );
 
       return res.json(success("成功"));
