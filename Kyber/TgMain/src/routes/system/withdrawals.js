@@ -1,8 +1,7 @@
-
 const express = require("express");
-const { setReviewers } = require("../../service/system/reviewStore")
-const { approveKeyboard,formatWithdrawCard } = require("../../service/system/ui")
-const { success, fail } = require('../../utils/responseWrapper');
+const { setReviewers } = require("../../service/system/reviewStore");
+const { approveKeyboard, formatWithdrawCard } = require("../../service/system/ui");
+const { success, fail } = require("../../utils/responseWrapper");
 const merChatService = require("../../service/system/sysMerchantChatService");
 const router = express.Router();
 /**
@@ -20,10 +19,15 @@ const router = express.Router();
 module.exports = function createWithdrawalsRouter(bot) {
   const router = express.Router();
 
+  const esc = (s = "") => String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
   router.post("/withdrawals/create", async (req, res) => {
-    const { merchant_id, order_id, amount, exchange_rate, remark = "" } = req.body || {};
+    const { merchant_id, order_id, amount, exchange_rate, remark = "", currency } = req.body || {};
     try {
-      if (!merchant_id || !order_id || amount === undefined || exchange_rate === undefined) {
+      if (!merchant_id || !order_id || amount === undefined || exchange_rate === undefined || !currency) {
         return res.json(fail("参数异常"));
       }
 
@@ -37,11 +41,12 @@ module.exports = function createWithdrawalsRouter(bot) {
       await setReviewers(String(order_id), reviewerIds || []);
 
       const text = formatWithdrawCard({
-        orderId: String(order_id),
-        amount: String(amount),
-        exchangeRate: String(exchange_rate),
-        remark: String(remark || ""),
-        merchantId: String(merchant_id),
+        orderId: esc(String(order_id)),
+        amount: esc(String(amount)),
+        exchangeRate: esc(String(exchange_rate)),
+        remark: esc(String(remark || "")),
+        merchantId: esc(String(merchant_id)),
+        currency: esc(String(currency)),
       });
 
       await bot.telegram.sendMessage(
