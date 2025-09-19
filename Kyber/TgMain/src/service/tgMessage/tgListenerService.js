@@ -82,12 +82,6 @@ async function handleEvent(client, event, isRunning) {
   // ----------- 命令查询“未处理”的订单 -----------
   if (typeof message.message === "string"
   ) {
-    if (message.message === "hello") {
-      await client.sendMessage(chatId, {
-        message: "你好",
-        replyTo: message.id
-      });
-    }
     //0是关闭，1是开启
     //orderChatId
     //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
@@ -182,7 +176,13 @@ async function handleEvent(client, event, isRunning) {
           return false;
         }
         if (await isAuthorized(command, chatId)) {
-          await handleOrder.requestUrl(command, userArgs, message.message, client, chatId);
+          if(command.url.includes("api.pay.ersan.click")){
+            console.log("这个命令是调用军哥支付平台的接口:", command.url);
+            await handleOrder.requestErsanUrl(command, userArgs, message.message, client, chatId);
+            return true;
+          }else {
+            await handleOrder.requestUrl(command, userArgs, message.message, client, chatId);
+          }
         }
       });
     }

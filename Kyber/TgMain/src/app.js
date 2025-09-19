@@ -13,6 +13,8 @@ const projectDataRoutes = require("./routes/project/projectDataRoutes");
 const tgParameterListRoutes = require("./routes/command/tgParameterListRoutes");
 const tgCommandListRoutes = require("./routes/command/tgCommandListRoutes");
 const tgComGroPeRoutes = require("./routes/command/tgComGroPeRoutes");
+const sysWithdrawals = require("./routes/system/withdrawals");
+const { bot } = require("./service/system/bot");
 
 require("./models/mysqlModel");
 const session = require("express-session");
