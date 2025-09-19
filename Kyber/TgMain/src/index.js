@@ -3,7 +3,7 @@ const dotenv = require("dotenv");
 
 const express = require("express");
 
-const env = process.env.NODE_ENV || "development";
+const env = process.env.NODE_ENV || "production";
 const envPath = path.resolve(__dirname, `../.env.${env}`);
 dotenv.config({ path: envPath });
 
