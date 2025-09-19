@@ -16,7 +16,6 @@ exports.getByTelegramIdChatId = async (telegramId, chatId) => {
                WHERE telegram_id = ?
                  AND chat_id = ? LIMIT 1`;
 
-
   const [rows] = await db.query(sql, [telegramId, chatId]);
 
   return rows[0] || null;

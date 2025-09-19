@@ -1,5 +1,10 @@
 const tgDbService = require("../tgDbService");
 const axios = require("axios");
+const { redis } = require("../../models/redisModel");
+
+
+const ERSAN_TOKEN_KEY = "ersan:accessToken";
+
 /**
  * 处理命令型的请求
  * @param command
@@ -9,7 +14,7 @@ const axios = require("axios");
  * @param chatId
  * @return {Promise<void>}
  */
-async function requestUrl(command,userArgs,inputCommand, client, chatId) {
+async function requestUrl(command, userArgs, inputCommand, client, chatId) {
 
   try {
     const params = await tgDbService.getParamsByCommandId(command.id);
@@ -50,6 +55,86 @@ async function requestUrl(command,userArgs,inputCommand, client, chatId) {
   }
 }
 
+async function getErsanToken(redis) {
+  const cached = await redis.get(ERSAN_TOKEN_KEY);
+  if (cached) {
+    try {
+      const { token, exp } = JSON.parse(cached);
+      if (token && typeof exp === "number" && Date.now() < exp) {
+        return token;
+      }
+    } catch {}
+  }
+
+  const loginUrl = "https://api.pay.ersan.click/admin-api/system/auth/login";
+  const loginBody = { type: 0, username: "robot", password: "robot132456" };
+
+  const resp = await axios.post(loginUrl, loginBody);
+  if (!resp?.data || resp.data.code !== 0 || !resp.data.data) {
+    throw new Error(`登录接口返回异常：${JSON.stringify(resp?.data)}`);
+  }
+
+  const { accessToken, expiresTime } = resp.data.data;
+  if (!accessToken || !expiresTime) {
+    throw new Error("登录响应缺少 accessToken 或 expiresTime");
+  }
+
+  const now = Date.now();
+  const tenMin = 10 * 60 * 1000;
+  const safeExpireTs = Math.max(now + 60 * 1000, expiresTime - tenMin);
+  const ttlSec = Math.max(60, Math.floor((safeExpireTs - now) / 1000));
+
+  await redis.set(ERSAN_TOKEN_KEY, JSON.stringify({ token: accessToken, exp: safeExpireTs }), "EX", ttlSec);
+  return accessToken;
+}
+
+async function requestErsanUrl(command, userArgs, inputCommand, client, chatId) {
+  try {
+    const token = await getErsanToken(redis);
+
+    const params = await tgDbService.getParamsByCommandId(command.id);
+    const requiredParams = params.filter(p => p.required === 1);
+    if (userArgs.length < requiredParams.length) {
+      await client.sendMessage(chatId, {
+        message: `⚠️ 参数不足，至少需要 ${requiredParams.length} 个参数`
+      });
+      return;
+    }
+
+    const body = {};
+    for (let i = 0; i < params.length; i++) {
+      const paramName = params[i].parameter_name;
+      const userValue = userArgs[i] ?? ""; // 避免把 0/false 变成空串
+      body[paramName] = userValue;
+    }
+
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "tenant-id": "1",
+    };
+
+    const method = String(command.method || "GET").toUpperCase();
+    let response;
+    if (method === "GET") {
+      response = await axios.get(command.url, { params: body, headers });
+    } else {
+      response = await axios.post(command.url, body, { headers });
+    }
+
+    const resText = JSON.stringify(response.data, null, 2);
+    await client.sendMessage(chatId, {
+      message: `✅ 请求成功:\n${resText}`
+    });
+
+  } catch (e) {
+    console.error(`[ERROR] 机器人调用 ersan 接口失败:`, e);
+    await client.sendMessage(chatId, {
+      message: `❌ 系统繁忙，请稍后重试！`
+    });
+  }
+}
+
 module.exports = {
-  requestUrl
+  requestUrl,
+  requestErsanUrl
 };
