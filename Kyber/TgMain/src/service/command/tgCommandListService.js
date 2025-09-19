@@ -175,3 +175,19 @@ exports.deleteCommandById = (id) => {
     });
   });
 };
+
+exports.getByIdentifierUrl = (identifier, urlKeyword) => {
+  const sql = `
+      SELECT *
+      FROM tg_command_list
+      WHERE identifier = ?
+        AND url LIKE CONCAT('%', ?, '%')
+          LIMIT 1
+  `;
+  return new Promise((resolve, reject) => {
+    db.query(sql, [identifier, urlKeyword], (err, result) => {
+      if (err) return reject(err);
+      resolve(result[0] || null); // 只返回一条或 null
+    });
+  });
+};
