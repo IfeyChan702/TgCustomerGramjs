@@ -11,7 +11,7 @@ const app = require("./app");
 const { bot, startBot } = require("./service/system/bot");
 const createWithdrawalsRouter = require("./routes/system/withdrawals");
 
-const PORT = process.env.PORT || 8087;
+const PORT = 8087;
 
 app.listen(PORT, () => {
   console.log(`后端服务已启动：http://localhost:${PORT}`);
