@@ -7,6 +7,7 @@ const { approvedSuffix, waitingReasonSuffix } = require("../ui");
 function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
     try {
+      console.log("[用户点击回调]callback_query")
       const [action, orderId, mid, sig] = ctx.callbackQuery.data.split("|");
       const merchantId = parseInt(mid, 10);
 

@@ -10,7 +10,7 @@ dotenv.config({ path: envPath });
 const app = require("./app");
 
 const { bot, startBot } = require("./service/system/bot");
-const createWithdrawalsRouter = require("./routes/system/withdrawals");
+const createWithdrawalsRouter = require("./routes/system/withdrawalsRoutes");
 const PORT = 8087;
 
 app.use(express.json());
