@@ -13,6 +13,9 @@ const createWithdrawalsRouter = require("./routes/system/withdrawals");
 
 const PORT = 8087;
 
+app.use(express.json());
+app.use("/api", createWithdrawalsRouter(bot));
+
 app.listen(PORT, () => {
   console.log(`后端服务已启动：http://localhost:${PORT}`);
 });
@@ -21,5 +24,5 @@ startBot().catch((err) => {
   console.error("❌ Bot 启动失败:", err);
 });
 
-app.use("/api", createWithdrawalsRouter(bot));
+
 
