@@ -3,16 +3,17 @@ const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 const axios = require("axios");
 const tgDbService = require("../tgDbService");
-const { getOrRunMessageResponse,onceByKey } = require("../../utils/lockUtil");
+const { getOrRunMessageResponse, onceByKey } = require("../../utils/lockUtil");
 const { redis } = require("../../models/redisModel");
 const handleOrder = require("../handle/handleOrder");
 const handleRate = require("../handle/handleRate");
 const handleSuccess = require("../handle/handleSuccess");
-const tgMsgHandle = require("../tgMessage/tgMsgHandService")
+const tgMsgHandle = require("../tgMessage/tgMsgHandService");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
 const orderChatId = -4856325360;//线上的命令群
+const MAX_THREAD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 // 允许使用 success 命令的群
 const ALLOWED_SUCCESS_CHAT_IDS = new Set([
   "-4750453063",
@@ -74,7 +75,7 @@ async function handleEvent(client, event, isRunning) {
   const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
 
   //TODO 逻辑可能有问题
-  if (2 === isRunning){
+  if (2 === isRunning) {
     await tgMsgHandle.recMsg(client, event);
     return;
   }
@@ -176,11 +177,11 @@ async function handleEvent(client, event, isRunning) {
           return false;
         }
         if (await isAuthorized(command, chatId)) {
-          if(command.url.includes("api.pay.ersan.click")){
+          if (command.url.includes("api.pay.ersan.click")) {
             console.log("这个命令是调用军哥支付平台的接口:", command.url);
             await handleOrder.requestErsanUrl(command, userArgs, message.message, client, chatId);
             return true;
-          }else {
+          } else {
             await handleOrder.requestUrl(command, userArgs, message.message, client, chatId);
           }
         }
@@ -337,37 +338,49 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 
 // ========== 渠道群回复监听 → 回转商户群 ============
 async function handleChannelReply(client, chatId, chatTitle, message) {
-  const replyKey = `replyfwd:${chatId}:${message.id}`;
-  const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 90);
-  if (!ok) return;
-  const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
-  if (!channelGroupIds.has(String(chatId))) return;
+  try{
+    const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
+    if (!channelGroupIds.has(String(chatId))) return;
 
-  const replyToId = message.replyTo.replyToMsgId;
-  const context = await tgDbService.getOrderByChannelMsgId(replyToId);
-  //const context = orderContextMap.get(replyToId);
+    const replyKey = `replyfwd:${chatId}:${message.id}`;
+    const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 90);
+    if (!ok) return;
 
-  if (context && context.merchant_msg_id && context.merchant_chat_id) {
-    const replyContent = message.text || "";
-    const replyText = await tgDbService.getReplyText(replyContent);
-    let replyId = null;
+    const replyToId = message.replyTo?.replyToMsgId;
+    if (!replyToId) return;
 
-    if (replyText === null) {
-      await client.sendMessage(orderChatId, {
-        message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`
-      });
-      console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
+    //做一个“时效窗口”防止离线历史消息回放
+    const now = Date.now();
+    const msgTs = message.date?.getTime?.() ?? 0;
+    if (now - msgTs > MAX_THREAD_AGE_MS) return;
+
+    const context = await tgDbService.getOrderByChannelMsgId(replyToId);
+    //const context = orderContextMap.get(replyToId);
+
+    if (context && context.merchant_msg_id && context.merchant_chat_id) {
+      const replyContent = message.message || "";
+      const replyText = await tgDbService.getReplyText(replyContent);
+      let replyId = null;
+
+      if (replyText === null) {
+        await client.sendMessage(orderChatId, {
+          message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`
+        });
+        console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
+      } else {
+        replyId = replyText.id;
+        await client.sendMessage(context.merchant_chat_id, {
+          message: replyText.reply_text,
+          replyTo: context.merchant_msg_id
+        });
+        console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
+        await tgDbService.updateOrderStatusByChannelMsgId(replyToId, replyId);
+      }
     } else {
-      replyId = replyText.id;
-      await client.sendMessage(context.merchant_chat_id, {
-        message: replyText.reply_text,
-        replyTo: context.merchant_msg_id
-      });
-      console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
-      await tgDbService.updateOrderStatusByChannelMsgId(replyToId, replyId);
+      console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
     }
-  } else {
-    console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
+  }catch (err){
+    console.error(`handleChannelReply:`,err);
   }
 }
 
