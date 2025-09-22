@@ -7,13 +7,12 @@ const router = express.Router();
 /**
  * POST /withdrawals/create
  * body = {
- *   merchant_id: number | string,          // 商户标识（必填）
- *   order_id: string,                      // 订单号（必填）
+ *   merchantNo: number | string,          // 商户标识（必填）
+ *   orderId: string,                      // 订单号（必填）
  *   amount: string | number,               // 金额（必填）
- *   exchange_rate: string | number,        // 汇率（必填）
+ *   exchangeRate: string | number,        // 汇率（必填）
  *   remark?: string,                       // 备注（可选）
- *   reviewer_ids?: number[],               // 审核人白名单（可选）
- *   chat_id?: number                       // 覆盖群ID（可选；不传则按商户查）
+ *   currency?: number                       // 覆盖群ID（可选；不传则按商户查）
  * }
  */
 module.exports = function createWithdrawalsRouter(bot) {
@@ -25,13 +24,13 @@ module.exports = function createWithdrawalsRouter(bot) {
     .replace(/>/g, "&gt;");
 
   router.post("/withdrawals/create", async (req, res) => {
-    const { merchantName, orderId, amount, exchangeRate, remark = "", currency } = req.body || {};
+    const { merchantNo, orderId, amount, exchangeRate, remark = "", currency } = req.body || {};
     try {
-      if (!merchantName || !orderId || amount === undefined || exchangeRate === undefined || !currency) {
+      if (!merchantNo || !orderId || amount === undefined || exchangeRate === undefined || !currency) {
         return res.json(fail("参数异常"));
       }
 
-      const chatReviewer = await merChatService.getChatIdAndReviewer(merchantName, "audit");
+      const chatReviewer = await merChatService.getChatIdAndReviewer(merchantNo, "audit");
       if (!chatReviewer || !chatReviewer.chatId) {
         return res.json(fail("chatId不存在或者系统没有这个商户标识！"));
       }
@@ -45,14 +44,14 @@ module.exports = function createWithdrawalsRouter(bot) {
         amount: esc(String(amount)),
         exchangeRate: esc(String(exchangeRate)),
         remark: esc(String(remark || "")),
-        merchantId: esc(String(merchantName)),
+        merchantId: esc(String(merchantNo)),
         currency: esc(String(currency)),
       });
 
       await bot.telegram.sendMessage(
         chatId,
         text,
-        { parse_mode: "HTML", ...approveKeyboard(String(orderId), String(merchantName)) }
+        { parse_mode: "HTML", ...approveKeyboard(String(orderId), String(merchantNo)) }
       );
 
       return res.json(success("成功"));

@@ -1,9 +1,12 @@
 const axios = require("axios");
 const { backendBase, backendToken } = require("../../config/botConfig");
+const { getErsanToken } = require("../../service/handle/handleOrder")
+const { redis } = require("../../models/redisModel");
 
 async function callbackBackend(applicationNo, approver, status) {
   const url = `https://api.mch.ersan.click/admin-api/plt/withdrawal-application/check`;
   try {
+    const token = await getErsanToken(redis);
     const res = await axios.put(
       url,
       {
@@ -14,7 +17,7 @@ async function callbackBackend(applicationNo, approver, status) {
       {
         headers: {
           "tenant-id": "1",
-          Authorization: `Bearer test1`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         }
       }
