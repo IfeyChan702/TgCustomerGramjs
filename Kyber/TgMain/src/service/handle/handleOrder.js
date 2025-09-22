@@ -136,5 +136,6 @@ async function requestErsanUrl(command, userArgs, inputCommand, client, chatId) 
 
 module.exports = {
   requestUrl,
-  requestErsanUrl
+  requestErsanUrl,
+  getErsanToken
 };

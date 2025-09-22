@@ -59,7 +59,7 @@ function registerGroupHandler(bot) {
     const command = await tgCommandListService.getByIdentifierUrl(identifier, "api.pay.ersan.click");
     if (command) {
 
-      const context = await payoutOrder.requestUrl(command, userArgs);
+      const context = await payoutOrder.requestErsanUrl(command, userArgs);
 
       return ctx.reply(context);
     }

@@ -179,7 +179,7 @@ async function handleEvent(client, event, isRunning) {
         if (await isAuthorized(command, chatId)) {
           if (command.url.includes("api.pay.ersan.click")) {
             console.log("这个命令是调用军哥支付平台的接口:", command.url);
-            await handleOrder.requestErsanUrl(command, userArgs, message.message, client, chatId);
+            /*await handleOrder.requestErsanUrl(command, userArgs, message.message, client, chatId);*/
             return true;
           } else {
             await handleOrder.requestUrl(command, userArgs, message.message, client, chatId);
