@@ -1,6 +1,6 @@
 // src/service/system/handlers/group.js
 const tgCommandListService = require("../../command/tgCommandListService");
-const payoutOrder = require("../handlers/groupCommand/payoutOrder");
+const merCommand = require("./groupCommand/merCommand");
 console.log("[Group] module loaded from", __filename);
 
 function registerGroupHandler(bot) {
@@ -53,13 +53,17 @@ function registerGroupHandler(bot) {
       return ctx.replyWithHTML(lines.join("\n"));
     }
 
+    if (/^\/merchantNo(?:@\w+)?$/i.test(token)) {
+
+    }
+
     const parts = text.trim().split(/\s+/);
     const identifier = parts[0].replace("/", "");
     const userArgs = parts.slice(1);
     const command = await tgCommandListService.getByIdentifierUrl(identifier, "api.pay.ersan.click");
     if (command) {
 
-      const context = await payoutOrder.requestErsanUrl(command, userArgs);
+      const context = await merCommand.requestErsanUrl(command, userArgs);
 
       if (!context) return next?.();
 

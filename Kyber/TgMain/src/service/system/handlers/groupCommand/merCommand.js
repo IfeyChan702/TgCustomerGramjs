@@ -18,14 +18,14 @@ async function requestErsanUrl(command, userArgs, chatIdFromArg) {
       command?.chat?.id;
 
     if (!chatId) {
-      console.warn(`[payoutOrder requestErsanUrl]=找不到chatId,chatId=`, chatId);
+      console.warn(`[merCommand requestErsanUrl]=找不到chatId,chatId=`, chatId);
       return;
     }
 
     const merchantNo = await sysMerchantChatService.getMerchantNoByChatId(String(chatId));
 
     if (!merchantNo) {
-      console.warn(`[payoutOrder requestErsanUrl] 找不到 merchantNo, chatId=`, chatId);
+      console.warn(`[merCommand requestErsanUrl] 找不到 merchantNo, chatId=`, chatId);
       return;
     }
 
@@ -62,7 +62,7 @@ async function requestErsanUrl(command, userArgs, chatIdFromArg) {
     }
 
     if (typeof response?.data?.code !== "undefined" && response.data.code !== 0) {
-      console.warn(`[payoutOrder requestErsanUrl] 接口返回失败 code=${response.data.code}, msg=${response.data.msg}`);
+      console.warn(`[merCommand requestErsanUrl] 接口返回失败 code=${response.data.code}, msg=${response.data.msg}`);
       return; // 静默
     }
 
@@ -78,7 +78,7 @@ async function requestErsanUrl(command, userArgs, chatIdFromArg) {
 
     return result;
   } catch (err) {
-    console.error(`[requestErsanUrl-Bot]`, err);
+    console.error(`[merCommand-requestErsanUrl-bot]`, err);
     return;
   }
 }
