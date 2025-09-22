@@ -61,6 +61,8 @@ function registerGroupHandler(bot) {
 
       const context = await payoutOrder.requestErsanUrl(command, userArgs);
 
+      if (!context) return next?.();
+
       return ctx.reply(context);
     }
     return next?.();

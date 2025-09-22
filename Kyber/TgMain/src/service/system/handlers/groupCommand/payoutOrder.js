@@ -1,51 +1,88 @@
 const tgDbService = require("../../../../service/tgDbService");
 const axios = require("axios");
-const { getErsanToken } = require("../../../../service/handle/handleOrder")
+const { getErsanToken } = require("../../../../service/handle/handleOrder");
+const sysMerchantChatService = require("../../../../service/system/sysMerchantChatService");
 const { redis } = require("../../../../models/redisModel");
 
-const ERSAN_TOKEN_KEY = "ersan:accessToken";
 
-async function requestErsanUrl( command, userArgs) {
+const AUTO_FILLED_PARAMS = new Set(["merchantNo"]);
+
+async function requestErsanUrl(command, userArgs, chatIdFromArg) {
   try {
     const token = await getErsanToken(redis);
 
-    const params = await tgDbService.getParamsByCommandId(command.id);
+    const chatId =
+      chatIdFromArg ??
+      command?.chatId ??
+      command?.context?.chatId ??
+      command?.chat?.id;
+
+    if (!chatId) {
+      console.warn(`[payoutOrder requestErsanUrl]=找不到chatId,chatId=`, chatId);
+      return;
+    }
+
+    const merchantNo = await sysMerchantChatService.getMerchantNoByChatId(String(chatId));
+
+    if (!merchantNo) {
+      console.warn(`[payoutOrder requestErsanUrl] 找不到 merchantNo, chatId=`, chatId);
+      return;
+    }
+
+    const params = await tgDbService.getParamsByCommandId(command.id) || [];
     const requiredParams = params.filter(p => p.required === 1);
-    if (userArgs.length < requiredParams.length) {
-      return `⚠️ 参数不足，至少需要 ${requiredParams.length} 个参数`;
+    const effectiveRequiredCount = requiredParams
+      .filter(p => !AUTO_FILLED_PARAMS.has(p.parameter_name))
+      .length;
+    if (userArgs.length < effectiveRequiredCount) {
+      return `⚠️ 参数不足，至少需要 ${effectiveRequiredCount} 个参数`;
     }
     const body = {};
-    for (let i = 0; i < params.length; i++) {
-      const paramName = params[i].parameter_name;
-      const userValue = userArgs[i] ?? ""; // 避免把 0/false 变成空串
-      body[paramName] = userValue;
+    const argCount = Math.min(userArgs.length, params.length);
+    for (let i = 0; i < argCount; i++) {
+      const name = params[i].parameter_name;
+      const userValue = userArgs[i] ?? "";
+      body[name] = userValue;
     }
+
+    body.merchantNo = merchantNo;
 
     const headers = {
       Authorization: `Bearer ${token}`,
-      "tenant-id": "1",
+      "tenant-id": "1"
     };
 
     const method = String(command.method || "GET").toUpperCase();
     let response;
+    const axiosCfg = { headers, timeout: 15000 };
     if (method === "GET") {
-      response = await axios.get(command.url, { params: body, headers });
+      response = await axios.get(command.url, { ...axiosCfg, params: body });
     } else {
-      response = await axios.post(command.url, body, { headers });
+      response = await axios.post(command.url, body, axiosCfg);
     }
 
-    const data = response.data.data;
-    const result = Object.entries(data)
-      .map(([key, value]) => `${key}: ${value ?? ""}`)
+    if (typeof response?.data?.code !== "undefined" && response.data.code !== 0) {
+      console.warn(`[payoutOrder requestErsanUrl] 接口返回失败 code=${response.data.code}, msg=${response.data.msg}`);
+      return; // 静默
+    }
+
+    const data = response?.data?.data ?? null;
+    if (!data || (typeof data !== "object")) return;
+    const entries = Array.isArray(data)
+      ? data.map((v, i) => [i, v])
+      : Object.entries(data);
+
+    const result = entries
+      .map(([k, v]) => `${k}: ${v == null ? "" : (typeof v === "object" ? JSON.stringify(v) : v)}`)
       .join("\n");
 
     return result;
-  }catch (err){
-    console.error(`[requestErsanUrl-Bot]`,err)
-    return "❌ 系统繁忙，请稍后重试！";
+  } catch (err) {
+    console.error(`[requestErsanUrl-Bot]`, err);
+    return;
   }
 }
 
 module.exports = {
-  requestErsanUrl,
+  requestErsanUrl
 };

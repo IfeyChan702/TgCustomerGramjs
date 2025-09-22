@@ -1,13 +1,13 @@
 const db = require("../../models/mysqlModel");
 
-exports.getChatIdAndReviewer = async (merchantId, role = "audit") => {
+exports.getChatIdAndReviewer = async (merchantNo, role = "audit") => {
   const sql = `
       SELECT s.chat_id, s.reviewer_ids
       FROM sys_merchant_chat s
-      WHERE s.merchant_id = ?
+      WHERE s.merchant_no = ?
         AND s.role = ? LIMIT 1
   `;
-  const [rows] = await db.query(sql, [merchantId, role]);
+  const [rows] = await db.query(sql, [merchantNo, role]);
   if (!rows?.length) return null;
 
   const row = rows[0];
@@ -21,4 +21,14 @@ exports.getChatIdAndReviewer = async (merchantId, role = "audit") => {
     }
   }
   return { chatId: Number(row.chat_id), reviewerIds };
+};
+
+exports.getMerchantNoByChatId = async (chatId) => {
+  const sql = `
+      SELECT merchant_no
+      FROM sys_merchant_chat
+      WHERE chat_id = ? LIMIT 1
+  `;
+  const rows = await db.query(sql, [chatId]);
+  return rows?.[0]?.merchant_no || null;
 };
