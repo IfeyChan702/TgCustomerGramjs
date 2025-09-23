@@ -8,11 +8,14 @@ function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
     try {
       console.log("[用户点击回调]callback_query");
-      const [action, orderId, mid, sig] = ctx.callbackQuery.data.split("|");
-      const merchantId = parseInt(mid, 10);
+      const [action, orderId, mno, sig] = ctx.callbackQuery.data.split("|");
+      const merchantNo = mno;
+      if (!/^M\d{14,30}$/.test(mno)) {
+        return await ctx.answerCbQuery("商户NO格式错误", { show_alert: true });
+      }
 
       // 1) 先做纯计算/快速校验（不访问慢服务）
-      if (!verify(action, orderId, merchantId, sig)) {
+      if (!verify(action, orderId, merchantNo, sig)) {
         return await ctx.answerCbQuery("签名校验失败", { show_alert: true });
       }
 
