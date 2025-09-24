@@ -343,7 +343,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     if (!channelGroupIds.has(String(chatId))) return;
 
     const replyKey = `replyfwd:${chatId}:${message.id}`;
-    const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 90);
+    const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 30);
     if (!ok) return;
 
     const replyToId = message.replyTo?.replyToMsgId;
@@ -351,7 +351,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
 
     //做一个“时效窗口”防止离线历史消息回放
     const now = Date.now();
-    const msgTs = message.date?.getTime?.() ?? 0;
+    const msgTs = getMsgTimestampMillis(message);
     if (now - msgTs > MAX_THREAD_AGE_MS) return;
 
     const context = await tgDbService.getOrderByChannelMsgId(replyToId);
@@ -694,6 +694,17 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
       message: `系统错误，"/chatId"命令处理失败`
     });
   }
+}
+
+function getMsgTimestampMillis(message) {
+  if (!message || message.date == null) return 0;
+  const d = message.date;
+  if (typeof d === 'number') {
+    // Telegram 通常是秒级时间戳，若值较小则乘以 1000
+    return d < 1e12 ? d * 1000 : d;
+  }
+  if (typeof d.getTime === 'function') return d.getTime();
+  return 0;
 }
 
 // =================== 模块导出 ====================
