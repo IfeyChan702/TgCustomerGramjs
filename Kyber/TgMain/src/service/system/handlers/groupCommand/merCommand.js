@@ -7,15 +7,10 @@ const { redis } = require("../../../../models/redisModel");
 
 const AUTO_FILLED_PARAMS = new Set(["merchantNo"]);
 
-async function requestErsanUrl(command, userArgs, chatIdFromArg) {
+async function requestErsanUrl(command, userArgs, chatId) {
   try {
     const token = await getErsanToken(redis);
 
-    const chatId =
-      chatIdFromArg ??
-      command?.chatId ??
-      command?.context?.chatId ??
-      command?.chat?.id;
 
     if (!chatId) {
       console.warn(`[merCommand requestErsanUrl]=找不到chatId,chatId=`, chatId);
