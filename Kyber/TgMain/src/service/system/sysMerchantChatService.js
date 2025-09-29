@@ -24,11 +24,16 @@ exports.getChatIdAndReviewer = async (merchantNo, role = "audit") => {
 };
 
 exports.getMerchantNoByChatId = async (chatId) => {
+
+  console.log("查询 chatId =", chatId, "类型 =", typeof chatId);
+
+
   const sql = `
       SELECT merchant_no
       FROM sys_merchant_chat
       WHERE chat_id = ? LIMIT 1
   `;
-  const rows = await db.query(sql, [chatId]);
+  const [rows] = await db.query(sql, [chatId]);
+  console.log('rows=',rows);
   return rows?.[0]?.merchant_no || null;
 };

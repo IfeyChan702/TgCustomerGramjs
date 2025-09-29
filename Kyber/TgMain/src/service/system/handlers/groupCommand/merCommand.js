@@ -64,11 +64,11 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const data = response?.data?.data ?? null;
     if (!data || (typeof data !== "object")) return;
     const entries = Array.isArray(data)
-      ? data.map((v, i) => [i, v])
+      ? data.map((v) => ["", v])
       : Object.entries(data);
 
     const result = entries
-      .map(([k, v]) => `${k}: ${v == null ? "" : (typeof v === "object" ? JSON.stringify(v) : v)}`)
+      .map(([_, v]) => v == null ? "" : (typeof v === "object" ? JSON.stringify(v) : v))
       .join("\n");
 
     return result;
