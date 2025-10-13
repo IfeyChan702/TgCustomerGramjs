@@ -22,6 +22,3 @@ app.listen(PORT, () => {
 startBot().catch((err) => {
   console.error("❌ Bot 启动失败:", err);
 });
-
-
-
