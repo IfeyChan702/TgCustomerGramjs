@@ -16,7 +16,7 @@ example.ts
 example.d.ts
 
 # dotenv
-#.env
+.env
 
 settings
 
