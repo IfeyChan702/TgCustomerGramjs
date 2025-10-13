@@ -1,10 +1,7 @@
-// src/app.js
-require('dotenv').config();                      // 1. 先加载 .env
-
 const express = require('express');
 const session = require('express-session');
 const { startRedis } = require('./models/redisModel');
-require('./models/mysqlModel');                  // 2. 初始化 DB（确保 .env 已加载）
+require('./models/mysqlModel'); // 1. 初始化 DB（确保 .env 已加载）
 
 // 路由
 const loginRoutes = require('./routes/loginRoutes');
@@ -20,18 +17,23 @@ const projectDataRoutes = require('./routes/project/projectDataRoutes');
 const tgParameterListRoutes = require('./routes/command/tgParameterListRoutes');
 const tgCommandListRoutes = require('./routes/command/tgCommandListRoutes');
 const tgComGroPeRoutes = require('./routes/command/tgComGroPeRoutes');
+const sysWithdrawals = require('./routes/system/withdrawalsRoutes'); // 🌟 来自第二个文件的新路由
 
 // Swagger
 const { swaggerUi, swaggerSpec } = require('./swagger');
 
 // JWT 守卫
-const { verifyToken } = require('../src/middleware/auth'); // 你发的中间件
+const { verifyToken } = require('../src/middleware/auth');
+
+// 启动服务 (Bot 服务初始化，来自第二个文件)
+const { bot } = require('./service/system/bot');
 
 const app = express();
 app.use(express.json());
 
-// 3) Redis / Session
+// 2) Redis / Session 初始化
 startRedis();
+// bot 模块的 require 已经包含在上方，如果需要显式启动，请在这里添加 bot()
 app.use(
   session({
     secret: 'my-captcha-secret',
@@ -41,29 +43,36 @@ app.use(
   })
 );
 
-// 4) 先挂 Swagger（在任何鉴权之前，且 swaggerSpec 不能为空）
+// 3) Swagger Setup
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/api-docs/swagger.json', (_req, res) => {
   res.type('application/json').send(swaggerSpec);
 });
 
-// 5) 开放路由（不需要 JWT）
-app.use('/api', loginRoutes); // /api/login/account、/api/captcha、/api/refresh 等
+// 4) 开放路由（无需 JWT 守卫，包含 /login/account, /captcha, /login/outLogin 等）
+// 我们在这里先挂载 loginRoutes，以便在守卫中只检查需要放行的路径。
+app.use('/api', loginRoutes);
 
-// 6) 从这里开始拦截业务路由，放行白名单
+// 5) JWT 认证守卫：拦截所有 /api 请求，放行白名单
 app.use('/api', (req, res, next) => {
-  // 白名单前缀（按你的路由实际情况增减）
-  const openPrefixes = [
-    '/login',          // /api/login/*
-    '/captcha',        // /api/captcha
-    '/refresh',        // /api/refresh
-    '/login/outLogin', // /api/login/outLogin
+
+  // 必须是完全公开的路径
+  const publicPaths = [
+    '/login/account',
+    '/captcha',
+    '/login/outLogin'
   ];
-  if (openPrefixes.some((p) => req.path.startsWith(p))) return next();
-  return verifyToken(req, res, next); // 其余都要带 Bearer
+
+  // 检查请求路径是否是白名单中的公开路径
+  if (publicPaths.some((p) => req.path.startsWith(p))) {
+    return next(); // 放行
+  }
+
+  // 其他所有 /api 路径都必须经过 JWT 验证
+  return verifyToken(req, res, next);
 });
 
-// 7) 受保护的业务路由（顺序随意，但都在守卫之后）
+// 6) 受保护的业务路由（都在守卫之后）
 app.use('/api', exportRoutes);
 app.use('/api/tg', tgRoutes);
 app.use('/api', replyRoutes);
@@ -71,10 +80,14 @@ app.use('/api', merchantRoutes);
 app.use('/api', accountRoutes);
 app.use('/api', channelRoutes);
 app.use('/api', orderRoutes);
-app.use('/api', projectDataRoutes, projectRoutes);
-app.use('/api', tgCommandListRoutes, tgParameterListRoutes, tgComGroPeRoutes);
+app.use('/api', projectDataRoutes);
+app.use('/api', projectRoutes);
+app.use('/api', tgCommandListRoutes);
+app.use('/api', tgParameterListRoutes);
+app.use('/api', tgComGroPeRoutes);
+app.use('/api', sysWithdrawals); // 🌟 已加入新路由
 
-// 8) 兜底错误
+// 7) 兜底错误处理
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ message: 'Server Error' });

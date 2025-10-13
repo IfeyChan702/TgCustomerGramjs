@@ -8,7 +8,16 @@ dotenv.config({ path: envPath });
 
 const app = require('./app');
 
-const PORT = process.env.PORT || 8087;
+const { bot, startBot } = require("./service/system/bot");
+const createWithdrawalsRouter = require("./routes/system/withdrawalsRoutes");
+const PORT = 8087;
+
+app.use(express.json());
+app.use("/api", createWithdrawalsRouter(bot));
 app.listen(PORT, () => {
   console.log(`后端服务已启动：http://localhost:${PORT}`);
+});
+
+startBot().catch((err) => {
+  console.error("❌ Bot 启动失败:", err);
 });
