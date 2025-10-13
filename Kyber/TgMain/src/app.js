@@ -20,7 +20,6 @@ const tgComGroPeRoutes = require('./routes/command/tgComGroPeRoutes');
 const sysWithdrawals = require('./routes/system/withdrawalsRoutes'); // 🌟 来自第二个文件的新路由
 
 require("./models/mysqlModel");
-const session = require("express-session");
 const { swaggerUi, swaggerSpec } = require("./swagger");
 
 // JWT 守卫
