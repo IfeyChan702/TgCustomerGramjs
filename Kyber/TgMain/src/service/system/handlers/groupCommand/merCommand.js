@@ -43,6 +43,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
       "tenant-id": "1"
     };
 
+
     const method = String(command.method || "GET").toUpperCase();
     let response;
     const axiosCfg = { headers, timeout: 15000 };
@@ -54,7 +55,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
 
     if (typeof response?.data?.code !== "undefined" && response.data.code !== 0) {
       console.warn(`[merCommand requestErsanUrl] 接口返回失败 code=${response.data.code}, msg=${response.data.msg}`);
-      return response.data.msg || "请求失败";
+      return;
     }
 
     const data = response?.data?.data ?? null;
@@ -66,44 +67,64 @@ async function requestErsanUrl(command, userArgs, chatId) {
     // ======= 新增：获取格式化配置 =======
     const formatCfg = await tgComFormatService.getFormatByCommandId(command.id);
     let result = "";
-
     // ======= 根据数据类型自动处理 =======
     if (Array.isArray(data)) {
-      // 数组：输出为表格
-      const keys = Object.keys(data[0] || {});
-      const header = keys.join(" | ");
-      const lines = data.map(row => keys.map(k => row[k] ?? "").join(" | "));
-      result = [header, ...lines].join("\n");
+      if (formatCfg?.format_template) {
+        result = data.map(item =>
+          formatCfg.format_template
+            .replace(/\{(\w+)\}/g, (_, key) => (item[key] ?? ""))
+            .replace(/\\n/g, "\n")
+            .replace(/\r/g, "")
+        ).join("\n\n");
+      } else {
+        const keys = Object.keys(data[0] || {});
+        const header = keys.join(" | ");
+        const lines = data.map(row => keys.map(k => row[k] ?? "").join(" | "));
+        result = [header, ...lines].join("\n");
+      }
     } else if (typeof data === "object") {
-      // 对象：使用模板或 JSON
       if (formatCfg?.format_template) {
         result = formatCfg.format_template
-          .replace(/\{(\w+)\}/g, (_, key) => data[key] ?? "")
-          .replace(/\\n/g, "\n");
+          .replace(/\{(\w+)\}/g, (_, key) => {
+            const val = data[key];
+            return (val !== undefined && val !== null) ? val : "";
+          })
+          .replace(/\\n/g, "\n")
+          .replace(/\r/g, "");
       } else {
         result = JSON.stringify(data, null, 2);
       }
-    } else {
-      result = String(data);
     }
 
-    // ======= 应用数据库配置的格式类型 =======
-    if (formatCfg && formatCfg.format_type) {
+    if ((!result || result.trim() === "") && formatCfg && formatCfg.format_type) {
       switch (formatCfg.format_type) {
         case "json":
           result = JSON.stringify(data, null, 2);
           break;
+
         case "text":
           if (formatCfg.format_template)
             result = formatCfg.format_template
               .replace(/\{(\w+)\}/g, (_, key) => data[key] ?? "")
-              .replace(/\\n/g, "\n");;
+              .replace(/\\n/g, "\n")
+              .replace(/\r/g, "");
+          else
+            result = JSON.stringify(data, null, 2);
           break;
+
         case "table":
-          // 已自动处理
+          if (Array.isArray(data)) {
+            const keys = Object.keys(data[0] || {});
+            const header = keys.join(" | ");
+            const lines = data.map(row => keys.map(k => row[k] ?? "").join(" | "));
+            result = [header, ...lines].join("\n");
+          } else {
+            result = JSON.stringify(data, null, 2);
+          }
           break;
+
         case "custom":
-          // 可自行扩展 markdown 或 html
+          // 可根据需求扩展 markdown/html
           result = JSON.stringify(data, null, 2);
           break;
       }
