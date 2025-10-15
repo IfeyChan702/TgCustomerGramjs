@@ -10,16 +10,6 @@ function approveKeyboard(orderId, merchantId) {
   ]);
 }
 
-function formatCard(orderId, amount, userDisplay) {
-  return (
-    `💸 <b>提现审核</b>\n` +
-    `订单号：<code>${orderId}</code>\n` +
-    `用户：${userDisplay}\n` +
-    `金额：${amount}\n\n` +
-    `请审核人确认。`
-  );
-}
-
 function formatWithdrawCard({ orderId, amount, exchangeRate, remark, merchantId, currency }) {
   // 按需做一个简单换算展示（不改变业务值）
   let converted = "";
@@ -57,7 +47,6 @@ function rejectedFinal(username, ts) {
 
 module.exports = {
   approveKeyboard,
-  formatCard,
   approvedSuffix,
   waitingReasonSuffix,
   rejectedFinal,
