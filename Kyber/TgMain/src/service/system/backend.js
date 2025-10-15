@@ -4,7 +4,7 @@ const { getErsanToken } = require("../../service/handle/handleOrder")
 const { redis } = require("../../models/redisModel");
 
 async function callbackBackend(applicationNo, approver, status) {
-  const url = `https://api.mch.ersan.click/admin-api/plt/withdrawal-application/check`;
+  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/check`;
   try {
     const token = await getErsanToken(redis);
     const res = await axios.put(
