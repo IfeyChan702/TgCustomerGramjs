@@ -1,7 +1,7 @@
 // handlers/callbacks.js
 const { verify } = require("../security");
 const { callbackBackend } = require("../backend");
-const { tryDecide, isDecided, isReviewer, setPending } = require("../reviewStore");
+const { tryDecide, isDecided, isReviewer,getReviewStatus,saveReviewStatus } = require("../reviewStore");
 const { approvedSuffix, waitingReasonSuffix } = require("../ui");
 
 function registerCallbackHandler(bot) {
@@ -34,11 +34,64 @@ function registerCallbackHandler(bot) {
       const ts = new Date().toLocaleString();
 
       if (action === "ok") {
-        const got = await tryDecide(orderId);
-        if (!got) {
-          // 不再二次 answerCbQuery，直接尝试提示用户方式是编辑消息或忽略
-          return;
+        const approverId = ctx.from.id;
+        const approver = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
+        const ts = new Date().toLocaleString();
+
+        // 读取审核状态
+        const reviewInfo = await getReviewStatus(orderId);
+        if (!reviewInfo) {
+          return await ctx.answerCbQuery("订单状态异常，请联系管理员", { show_alert: true });
         }
+
+        if (reviewInfo.decided) {
+          return await ctx.answerCbQuery("该订单已处理", { show_alert: true });
+        }
+
+        const needCount = reviewInfo.needCount || 1;
+        const approved = reviewInfo.approvedBy || [];
+
+        // 已经点过
+        if (approved.includes(approverId)) {
+          return await ctx.answerCbQuery("你已确认过，无需重复操作");
+        }
+
+        // 添加本次审核人
+        approved.push(approverId);
+        reviewInfo.approvedBy = approved;
+        await saveReviewStatus(orderId, reviewInfo);
+
+        const currentCount = approved.length;
+
+        //更新 Telegram 消息里的审核进度
+        const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
+        const progressLine = `已确认：${currentCount}/${needCount}`;
+        const baseText = original.replace(/已确认：\d+\/\d+/g, ""); // 清理旧的进度行
+        const newTextWithProgress = baseText + `\n${progressLine}`;
+
+        //如果还没达到人数要求，提示等待其他老板
+        try {
+          await ctx.editMessageText(newTextWithProgress, {
+            parse_mode: "HTML",
+            reply_markup: ctx.callbackQuery.message.reply_markup, // ✅ 保留按钮
+          });
+        } catch (err) {
+          console.warn("更新进度信息失败：", err.message);
+        }
+
+        if (currentCount < needCount) {
+          await ctx.answerCbQuery(`已确认 ${currentCount}/${needCount}，等待其他老板确认`, {
+            show_alert: true,
+          });
+          return; //终止，不进入通过逻辑
+        }
+
+        // 达到确认人数，进入最终通过流程
+        reviewInfo.decided = true;
+        await saveReviewStatus(orderId, reviewInfo);
+
+        const got = await tryDecide(orderId);
+        if (!got) return; // 幂等控制
 
         const ok = await callbackBackend(orderId, approver, 3);
         if (!ok) {
@@ -51,10 +104,9 @@ function registerCallbackHandler(bot) {
           return;
         }
 
-        // 使用 text 或 caption 兼容
-        const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
-        const newText = original + approvedSuffix(ctx.from.username || ctx.from.first_name, ts);
-        await ctx.editMessageText(newText, { parse_mode: "HTML" });
+        // 拼接通过后文本
+        const finalText = newTextWithProgress + approvedSuffix(ts);
+        await ctx.editMessageText(finalText, { parse_mode: "HTML" });
         return;
       }
 
@@ -84,7 +136,7 @@ function registerCallbackHandler(bot) {
       console.error(err);
       // 这里可能已超过时限/已答复过，避免再次 answerCbQuery 导致同样 400
       try {
-        await ctx.editMessageText("处理失败，请重试");
+        await ctx.editMessageText("处理失败");
       } catch {}
     }
   });
