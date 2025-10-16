@@ -19,7 +19,6 @@ function formatWithdrawCard({
                               balanceAvailable,
                               usdtAddress,
                               addressHint,
-                              amountRaw,
                               exchangeRate,
                               usdtFinal,
                               isSameAddress = true
@@ -28,7 +27,7 @@ function formatWithdrawCard({
     ? "请一位老板确认回U地址及申请"
     : "⚠️ 回U地址与上次不一致，请两位老板确认！";
 
-  const usdtAmountLine = `${amountRaw} / ${exchangeRate} = ${usdtFinal}`;
+  const usdtAmountLine = `${amount} / ${exchangeRate} = ${usdtFinal}`;
 
   return (
     `回 U 申 请\n` +
