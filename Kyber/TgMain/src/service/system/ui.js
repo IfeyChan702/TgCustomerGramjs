@@ -10,29 +10,43 @@ function approveKeyboard(orderId, merchantId) {
   ]);
 }
 
-function formatWithdrawCard({ orderId, amount, exchangeRate, remark, merchantId, currency }) {
-  // 按需做一个简单换算展示（不改变业务值）
-  let converted = "";
-  const amt = Number(amount);
-  const rate = Number(exchangeRate);
-  if (!Number.isNaN(amt) && !Number.isNaN(rate)) {
-    const val = (amt * rate).toFixed(2);
-    converted = `（按汇率换算：${amount} × ${exchangeRate} = <b>${val}</b>）`;
-  }
+function formatWithdrawCard({
+                              orderId,
+                              merchantName,
+                              currency,
+                              applyTime,
+                              amount,
+                              balanceAvailable,
+                              usdtAddress,
+                              addressHint,
+                              amountRaw,
+                              exchangeRate,
+                              usdtFinal,
+                              isSameAddress = true
+                            }) {
+  const confirmText = isSameAddress
+    ? "请一位老板确认回U地址及申请"
+    : "⚠️ 回U地址与上次不一致，请两位老板确认！";
+
+  const usdtAmountLine = `${amountRaw} / ${exchangeRate} = ${usdtFinal}`;
+
   return (
-    `💸 <b>提现审核</b>\n` +
-    `商户：<code>${merchantId}</code>\n` +
-    `订单号：<code>${orderId}</code>\n` +
-    `金额：<b>${amount}</b> ${converted}\n` +
-    `货币：<b>${currency}</b>\n` +
-    `汇率：<code>${exchangeRate}</code>\n` +
-    (remark ? `备注：${remark}\n` : "") +
-    `\n请审核人确认。`
+    `回 U 申 请\n` +
+    `订单号 <code>${orderId}</code>\n` +
+    `商户名: <code>${merchantName}</code>\n` +
+    `申请货币: <b>${currency}</b>\n` +
+    `申请时间: <code>${applyTime}</code>\n` +
+    `申请金额: <b>${amount}</b>\n` +
+    `可用金额: <b>${balanceAvailable}</b>\n` +
+    `回U地址: ❤️${usdtAddress}❤️\n` +
+    (addressHint ? `回U提示: ❤️${addressHint}❤️\n` : "") +
+    `回U数量: ${usdtAmountLine}\n` +
+    `${confirmText}`
   );
 }
 
-function approvedSuffix(username, ts) {
-  return `\n\n✅ 已同意\n审核人：@${username}\n时间：${ts}`;
+function approvedSuffix(ts) {
+  return `\n\n✅ 已同意 \n时间：${ts}`;
 }
 
 function waitingReasonSuffix() {

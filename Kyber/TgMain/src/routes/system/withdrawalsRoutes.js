@@ -24,10 +24,42 @@ module.exports = function createWithdrawalsRouter(bot) {
     .replace(/>/g, "&gt;");
 
   router.post("/withdrawals/create", async (req, res) => {
-    const { merchantNo, orderId, amount, exchangeRate, remark = "", currency } = req.body || {};
+    const {
+      merchantNo,
+      merchantName,
+      orderId,
+      amount,
+      currency,
+      balanceAvailable,
+      usdtAddress,
+      addressHint,
+      amountRaw,
+      exchangeRate,
+      usdtFinal,
+      applyTime,
+      isSameAddress = true
+    } = req.body || {};
     try {
-      if (!merchantNo || !orderId || amount === undefined || exchangeRate === undefined || !currency) {
-        return res.json(fail("参数异常"));
+      const requiredParams = {
+        merchantNo,
+        merchantName,
+        orderId,
+        amount,
+        currency,
+        balanceAvailable,
+        usdtAddress,
+        amountRaw,
+        exchangeRate,
+        usdtFinal,
+        applyTime,
+      };
+
+      const missing = Object.entries(requiredParams)
+        .filter(([_, v]) => v === undefined || v === null || String(v).trim() === "")
+        .map(([k]) => k);
+
+      if (missing.length > 0) {
+        return res.json(fail(`缺少必要参数: ${missing.join(", ")}`));
       }
 
       const chatReviewer = await merChatService.getChatIdAndReviewer(merchantNo, "audit");
@@ -37,15 +69,21 @@ module.exports = function createWithdrawalsRouter(bot) {
 
       const { chatId, reviewerIds } = chatReviewer;
 
-      await setReviewers(String(orderId), reviewerIds || []);
+      await setReviewers(orderId, reviewerIds, isSameAddress ? 1 : 2);
 
       const text = formatWithdrawCard({
-        orderId: esc(String(orderId)),
-        amount: esc(String(amount)),
-        exchangeRate: esc(String(exchangeRate)),
-        remark: esc(String(remark || "")),
-        merchantId: esc(String(merchantNo)),
-        currency: esc(String(currency)),
+        orderId: esc(orderId),
+        merchantName: esc(merchantName),
+        currency: esc(currency),
+        applyTime: esc(applyTime),
+        amount: esc(amount),
+        balanceAvailable: esc(balanceAvailable),
+        usdtAddress: esc(usdtAddress),
+        addressHint: esc(addressHint || ""),
+        amountRaw: esc(amountRaw),
+        exchangeRate: esc(exchangeRate),
+        usdtFinal: esc(usdtFinal),
+        isSameAddress,
       });
 
       await bot.telegram.sendMessage(
