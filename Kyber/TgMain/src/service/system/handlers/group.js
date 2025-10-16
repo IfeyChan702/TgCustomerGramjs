@@ -21,7 +21,7 @@ function registerGroupHandler(bot) {
     const token = text.slice(cmdEnt.offset, cmdEnt.offset + cmdEnt.length);
 
     // 1) /getchatid
-    if (/^\/getchatId(?:@\w+)?$/i.test(token)) {
+    if (/^\/getchatId1(?:@\w+)?$/i.test(token)) {
       if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
         // 如果不是群，直接忽略（或自行决定要不要在私聊返回）
         return;
@@ -29,6 +29,11 @@ function registerGroupHandler(bot) {
 
       const from = ctx.from;
       if (!from) return;
+
+      if (from.is_bot) {
+        console.log(`[Group] ${from.username} 是 bot，不私聊`);
+        return;
+      }
 
       try {
         await ctx.telegram.sendMessage(
