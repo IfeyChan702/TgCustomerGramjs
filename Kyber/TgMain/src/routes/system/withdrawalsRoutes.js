@@ -15,6 +15,29 @@ const router = express.Router();
  *   currency?: number                       // 覆盖群ID（可选；不传则按商户查）
  * }
  */
+
+const formatDate = (date) => {
+  let d = new Date(date);
+
+  // 如果解析失败，尝试补 T 或作为时间戳
+  if (isNaN(d.getTime())) {
+    if (typeof date === "string" && date.includes(" ")) {
+      d = new Date(date.replace(" ", "T")); // 补上 T，兼容 "2025-10-16 12:30:00"
+    } else if (!isNaN(Number(date))) {
+      d = new Date(Number(date)); // 时间戳
+    }
+  }
+
+  if (isNaN(d.getTime())) {
+    console.warn("⚠️ 无法解析时间:", date);
+    return "Invalid Date";
+  }
+
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+
 module.exports = function createWithdrawalsRouter(bot) {
   const router = express.Router();
 
@@ -33,13 +56,15 @@ module.exports = function createWithdrawalsRouter(bot) {
       balanceAvailable,
       usdtAddress,
       addressHint,
-      amountRaw,
       exchangeRate,
       usdtFinal,
       applyTime,
       isSameAddress = true
     } = req.body || {};
     try {
+
+      const formattedApplyTime = formatDate(applyTime || Date.now());
+
       const requiredParams = {
         merchantNo,
         merchantName,
@@ -48,10 +73,9 @@ module.exports = function createWithdrawalsRouter(bot) {
         currency,
         balanceAvailable,
         usdtAddress,
-        amountRaw,
         exchangeRate,
         usdtFinal,
-        applyTime,
+        applyTime: formattedApplyTime,
       };
 
       const missing = Object.entries(requiredParams)
@@ -75,12 +99,11 @@ module.exports = function createWithdrawalsRouter(bot) {
         orderId: esc(orderId),
         merchantName: esc(merchantName),
         currency: esc(currency),
-        applyTime: esc(applyTime),
+        applyTime: esc(formattedApplyTime),
         amount: esc(amount),
         balanceAvailable: esc(balanceAvailable),
         usdtAddress: esc(usdtAddress),
         addressHint: esc(addressHint || ""),
-        amountRaw: esc(amountRaw),
         exchangeRate: esc(exchangeRate),
         usdtFinal: esc(usdtFinal),
         isSameAddress,
@@ -101,6 +124,7 @@ module.exports = function createWithdrawalsRouter(bot) {
 
   return router;
 };
+
 
 
 
