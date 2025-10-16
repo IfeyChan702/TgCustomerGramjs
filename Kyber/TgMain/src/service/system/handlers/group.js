@@ -83,7 +83,9 @@ function registerGroupHandler(bot) {
 
       if (!context) return next?.();
 
-      return ctx.reply(context);
+      return ctx.reply(context, {
+        parse_mode: "HTML"
+      });
     }
     return next?.();
   });
