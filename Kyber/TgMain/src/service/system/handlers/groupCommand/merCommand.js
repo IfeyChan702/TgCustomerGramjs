@@ -26,7 +26,8 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const requiredParams = params.filter(p => p.required === 1);
     const effectiveRequiredCount = requiredParams.filter(p => !AUTO_FILLED_PARAMS.has(p.parameter_name)).length;
     if (userArgs.length < effectiveRequiredCount) {
-      return `⚠️ 参数不足，至少需要 ${effectiveRequiredCount} 个参数`;
+      console.warn(`参数不足，至少需要 ${effectiveRequiredCount} 个参数`);
+      return;
     }
 
     const body = {};
@@ -55,6 +56,8 @@ async function requestErsanUrl(command, userArgs, chatId) {
 
     if (typeof response?.data?.code !== "undefined" && response.data.code !== 0) {
       console.warn(`[merCommand requestErsanUrl] 接口返回失败 code=${response.data.code}, msg=${response.data.msg}`);
+      const msg = response.data.msg?.trim() || "";
+      if (msg.includes('订单不存在')) return msg;
       return;
     }
 
