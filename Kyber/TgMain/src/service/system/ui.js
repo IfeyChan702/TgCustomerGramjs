@@ -30,7 +30,7 @@ function formatWithdrawCard({
   const usdtAmountLine = `${amount} / ${exchangeRate} = ${usdtFinal}`;
 
   return (
-    `回 U 申 请\n` +
+    `提 现 申 请\n` +
     `订单号 <code>${orderId}</code>\n` +
     `商户名: <code>${merchantName}</code>\n` +
     `申请货币: <b>${currency}</b>\n` +
@@ -45,7 +45,7 @@ function formatWithdrawCard({
 }
 
 function approvedSuffix(ts) {
-  return `\n\n✅ 已同意 \n时间：${ts}`;
+  return `\n\n✅ 回U申请已确认,请稍等! \n时间：${ts}`;
 }
 
 function waitingReasonSuffix() {
