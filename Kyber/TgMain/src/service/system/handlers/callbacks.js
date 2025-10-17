@@ -118,7 +118,7 @@ function registerCallbackHandler(bot) {
         if (!ok) {
           try {
             await ctx.editMessageText(
-              (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新申请订单或者联系技术人员</b>",
+              (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
           } catch {}
@@ -126,7 +126,7 @@ function registerCallbackHandler(bot) {
         }
         const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
         const newText =
-          original + `<b>❌ 已拒绝</b> \n时间: ${ts}`;
+          original + `\n\n <b>❌ 回U申请被拒绝</b> \n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
         return;
       }
