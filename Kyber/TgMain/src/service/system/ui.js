@@ -35,8 +35,8 @@ function formatWithdrawCard({
     `商户名: <code>${merchantName}</code>\n` +
     `申请货币: <b>${currency}</b>\n` +
     `申请时间: <code>${applyTime}</code>\n` +
-    `申请金额: <b>${amount}</b>\n` +
     `可用金额: <b>${balanceAvailable}</b>\n` +
+    `申请金额: <b>${amount}</b>\n` +
     `回U地址: ❤️${usdtAddress}❤️\n` +
     (addressHint ? `回U提示: ❤️${addressHint}❤️\n` : "") +
     `回U数量: ${usdtAmountLine}\n` +
