@@ -67,7 +67,7 @@ async function getErsanToken(redis) {
   }
 
   const loginUrl = "https://api.pay.ersan.click/admin-api/system/auth/login";
-  const loginBody = { type: 0, username: "robot", password: "robot132456" };
+  const loginBody = { type: 0, username: "robot", password: "Apple_Rob@op*" };
 
   const resp = await axios.post(loginUrl, loginBody);
   if (!resp?.data || resp.data.code !== 0 || !resp.data.data) {
