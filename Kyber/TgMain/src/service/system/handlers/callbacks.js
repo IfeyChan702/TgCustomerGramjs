@@ -126,7 +126,7 @@ function registerCallbackHandler(bot) {
         }
         const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
         const newText =
-          original + `\n\n <b>❌ 回U申请被拒绝</b> \n时间: ${ts}`;
+          original + `\n\n <b>❌ 提现申请被拒绝</b> \n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
         return;
       }

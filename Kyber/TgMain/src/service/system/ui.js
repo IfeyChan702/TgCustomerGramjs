@@ -21,7 +21,8 @@ function formatWithdrawCard({
                               addressHint,
                               exchangeRate,
                               usdtFinal,
-                              isSameAddress = true
+                              isSameAddress = true,
+                              optType
                             }) {
   const confirmText = isSameAddress
     ? "请一位老板确认回U地址及申请"
@@ -29,23 +30,28 @@ function formatWithdrawCard({
 
   const usdtAmountLine = `${amount} / ${exchangeRate} = ${usdtFinal}`;
 
-  return (
+  let text =
     `提 现 申 请\n` +
-    `订单号 <code>${orderId}</code>\n` +
+    `订单号: <code>${orderId}</code>\n` +
     `商户名: <code>${merchantName}</code>\n` +
     `申请货币: <b>${currency}</b>\n` +
     `申请时间: <code>${applyTime}</code>\n` +
-    `申请金额: <b>${amount}</b>\n` +
-    `可用金额: <b>${balanceAvailable}</b>\n` +
-    `回U地址: ❤️${usdtAddress}❤️\n` +
-    (addressHint ? `回U提示: ❤️${addressHint}❤️\n` : "") +
-    `回U数量: ${usdtAmountLine}\n` +
-    `${confirmText}`
-  );
+    `可用金额: <b>${balanceAvailable}</b>\n`+
+    `申请金额: <b>${amount}</b>\n`;
+
+  if (Number(optType) === 0) {
+    text += `回U地址: ❤️${usdtAddress}❤️\n`;
+    if (addressHint) text += `回U提示: ❤️${addressHint}❤️\n`;
+    text += `回U数量: ${usdtAmountLine}\n`;
+  }
+
+  text += confirmText;
+
+  return text;
 }
 
 function approvedSuffix(ts) {
-  return `\n\n✅ 回U申请已确认,请稍等! \n时间：${ts}`;
+  return `\n\n✅ 提现申请已确认,请稍等! \n时间：${ts}`;
 }
 
 function waitingReasonSuffix() {
