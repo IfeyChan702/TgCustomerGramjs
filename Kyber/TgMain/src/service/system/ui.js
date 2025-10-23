@@ -39,7 +39,7 @@ function formatWithdrawCard({
     `可用金额: <b>${balanceAvailable}</b>\n`+
     `申请金额: <b>${amount}</b>\n`;
 
-  if (Number(optType) === 0) {
+  if (Number(optType) === 1) {
     text += `回U地址: ❤️${usdtAddress}❤️\n`;
     if (addressHint) text += `回U提示: ❤️${addressHint}❤️\n`;
     text += `回U数量: ${usdtAmountLine}\n`;
