@@ -59,6 +59,7 @@ module.exports = function createWithdrawalsRouter(bot) {
       exchangeRate,
       usdtFinal,
       applyTime,
+      optType,//0-法币提现,1-提U
       isSameAddress = true
     } = req.body || {};
     try {
@@ -72,10 +73,9 @@ module.exports = function createWithdrawalsRouter(bot) {
         amount,
         currency,
         balanceAvailable,
-        usdtAddress,
         exchangeRate,
-        usdtFinal,
         applyTime: formattedApplyTime,
+        optType
       };
 
       const missing = Object.entries(requiredParams)
@@ -107,6 +107,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         exchangeRate: esc(exchangeRate),
         usdtFinal: esc(usdtFinal),
         isSameAddress,
+        optType: esc(optType),
       });
 
       await bot.telegram.sendMessage(
