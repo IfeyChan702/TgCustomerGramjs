@@ -326,7 +326,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
       }
       console.log(`handleMerchantOrderMessage,调用登录接口的token=${token}`)
       response = await axios.get(
-        `https://api.pay.ersan.click/admin-api/plt/order-in/get/${orderId}`,
+        `https://api.gamecloud.vip/admin-api/plt/order-in/get/${orderId}`,
         {
           headers: {
             "tenant-id": "1",
