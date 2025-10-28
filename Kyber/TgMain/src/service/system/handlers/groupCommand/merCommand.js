@@ -53,7 +53,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
     } else {
       response = await axios.post(command.url, body, axiosCfg);
     }
-    console.info(`[merCommand requestErsanUrl] 调用接口 code=${response.data.code}, msg=${response.data.msg}`);
+    console.info(`[merCommand requestErsanUrl] 调用接口 code=${response.data.code}, data=${response.data.data}`);
     if (typeof response?.data?.code !== "undefined" && response.data.code !== 0) {
       console.warn(`[merCommand requestErsanUrl] 接口返回失败 code=${response.data.code}, msg=${response.data.msg}`);
       const msg = response.data.msg?.trim() || "";
