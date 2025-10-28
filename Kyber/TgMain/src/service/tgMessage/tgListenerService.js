@@ -299,11 +299,57 @@ async function handleMerchantOrderMessage(client, chatId, message) {
   const orderId = message.message.trim();
   console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
   try {
-    const response = await axios.get("https://bi.sompay.xyz/bi/payin/check", {
-      params: { order_id: orderId }
-    });
-    const channelId = response.data?.channel_id || "未获得到渠道ID";
-    const merchantOrderId = response.data?.orderId;
+
+    let response;
+    let source = "bi";
+
+    try {
+
+      response = await axios.get("https://bi.sompay.xyz/bi/payin/check", {
+        params: { order_id: orderId },
+        timeout: 5000
+      });
+
+      if (!response.data || !response.data.channel_id) {
+        throw new Error("第一个接口数据无效");
+      }
+
+    } catch (err) {
+      console.warn(`[WARN] 第一个接口失败:${err.message}，尝试备用接口...`);
+      source = "gameCloud";
+
+      const token = await handleOrder.getErsanToken(redis);
+
+      if (!token) {
+        console.warn("没有可用的 token，无法请求接口");
+        return;
+      }
+      console.log(`handleMerchantOrderMessage,调用登录接口的token=${token}`)
+      response = await axios.get(
+        `https://api.pay.ersan.click/admin-api/plt/order-in/get/${orderId}`,
+        {
+          headers: {
+            "tenant-id": "1",
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 8000
+        }
+      );
+    }
+
+    const raw = response.data || {};
+    const data = raw.data || raw;
+    if (data.data === null){
+      console.error(`data=null,response=${response}`)
+      return
+    }
+    const channelId = data.channel_id || data.channelId || "未获得到渠道ID";
+    const channelName = data.channel_name || data.channelName || "未知渠道";
+    const merchantOrderId = data.merchantOrderId || data.merchantOrderNo || "未知商户订单号";
+    const orderNo = data.orderId || data.orderNo || "未知平台订单号";
+    const channelOrderNo = data.channel_order_id || data.channelOrderNo || "未知渠道订单号";
+    const status = data.payResult || data.statusDesc || "未知状态";
+
     const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
 
     if (!targetChatIds.length) {
@@ -338,7 +384,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 
 // ========== 渠道群回复监听 → 回转商户群 ============
 async function handleChannelReply(client, chatId, chatTitle, message) {
-  try{
+  try {
     const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
     if (!channelGroupIds.has(String(chatId))) return;
 
@@ -379,8 +425,8 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     } else {
       console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
     }
-  }catch (err){
-    console.error(`handleChannelReply:`,err);
+  } catch (err) {
+    console.error(`handleChannelReply:`, err);
   }
 }
 
@@ -699,11 +745,11 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
 function getMsgTimestampMillis(message) {
   if (!message || message.date == null) return 0;
   const d = message.date;
-  if (typeof d === 'number') {
+  if (typeof d === "number") {
     // Telegram 通常是秒级时间戳，若值较小则乘以 1000
     return d < 1e12 ? d * 1000 : d;
   }
-  if (typeof d.getTime === 'function') return d.getTime();
+  if (typeof d.getTime === "function") return d.getTime();
   return 0;
 }
 
