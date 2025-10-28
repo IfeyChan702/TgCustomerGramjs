@@ -56,36 +56,43 @@ async function requestUrl(command, userArgs, inputCommand, client, chatId) {
 }
 
 async function getErsanToken(redis) {
-  const cached = await redis.get(ERSAN_TOKEN_KEY);
-  if (cached) {
-    try {
-      const { token, exp } = JSON.parse(cached);
-      if (token && typeof exp === "number" && Date.now() < exp) {
-        return token;
-      }
-    } catch {}
+  try {
+    const cached = await redis.get(ERSAN_TOKEN_KEY);
+    console.log(`getErsanToken cached = ${cached}`)
+    if (cached) {
+      try {
+        const { token, exp } = JSON.parse(cached);
+        if (token && typeof exp === "number" && Date.now() < exp) {
+          return token;
+        }
+      } catch {}
+    }
+    //https://api.pay.ersan.click/admin-api/system/auth/login测试环境
+    const loginUrl = "https://api.pay.ersan.click/admin-api/system/auth/login";
+    const loginBody = { type: 0, username: "robot", password: "robot132456" };
+
+    const resp = await axios.post(loginUrl, loginBody);
+    console.log(`getErsanToken 中 respond 返回的code = ${resp.code}，data = ${resp.data}`)
+    if (!resp?.data || resp.data.code !== 0 || !resp.data.data) {
+      throw new Error(`登录接口返回异常：${JSON.stringify(resp?.data)}`);
+    }
+
+    const { accessToken, expiresTime } = resp.data.data;
+    if (!accessToken || !expiresTime) {
+      throw new Error("登录响应缺少 accessToken 或 expiresTime");
+    }
+
+    const now = Date.now();
+    const tenMin = 10 * 60 * 1000;
+    const safeExpireTs = Math.max(now + 60 * 1000, expiresTime - tenMin);
+    const ttlSec = Math.max(60, Math.floor((safeExpireTs - now) / 1000));
+
+    await redis.set(ERSAN_TOKEN_KEY, JSON.stringify({ token: accessToken, exp: safeExpireTs }), "EX", ttlSec);
+    return accessToken;
+  }catch (err){
+    console.error(`getErsanToken:${err}`)
+    return null
   }
-
-  const loginUrl = "https://api.pay.ersan.click/admin-api/system/auth/login";
-  const loginBody = { type: 0, username: "robot", password: "robot132456" };
-
-  const resp = await axios.post(loginUrl, loginBody);
-  if (!resp?.data || resp.data.code !== 0 || !resp.data.data) {
-    throw new Error(`登录接口返回异常：${JSON.stringify(resp?.data)}`);
-  }
-
-  const { accessToken, expiresTime } = resp.data.data;
-  if (!accessToken || !expiresTime) {
-    throw new Error("登录响应缺少 accessToken 或 expiresTime");
-  }
-
-  const now = Date.now();
-  const tenMin = 10 * 60 * 1000;
-  const safeExpireTs = Math.max(now + 60 * 1000, expiresTime - tenMin);
-  const ttlSec = Math.max(60, Math.floor((safeExpireTs - now) / 1000));
-
-  await redis.set(ERSAN_TOKEN_KEY, JSON.stringify({ token: accessToken, exp: safeExpireTs }), "EX", ttlSec);
-  return accessToken;
 }
 
 async function requestErsanUrl(command, userArgs, inputCommand, client, chatId) {

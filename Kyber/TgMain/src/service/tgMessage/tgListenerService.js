@@ -318,23 +318,31 @@ async function handleMerchantOrderMessage(client, chatId, message) {
       console.warn(`[WARN] 第一个接口失败:${err.message}，尝试备用接口...`);
       source = "gameCloud";
 
-      const token = handleOrder.getErsanToken(redis);
+      const token = await handleOrder.getErsanToken(redis);
 
-      if (!token) throw new Error("无法获取getErsanToken 返回的 token");
-
-      response = await axios.get("https://api.gamecloud.vip/admin-api/plt/order-in/get", {
-        params: { orderNo: orderId },
-        timeout: 5000,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "tenant-id": 1
+      if (!token) {
+        console.warn("没有可用的 token，无法请求接口");
+        return;
+      }
+      console.log(`handleMerchantOrderMessage,调用登录接口的token=${token}`)
+      response = await axios.get(
+        `https://api.pay.ersan.click/admin-api/plt/order-in/get/${orderId}`,
+        {
+          headers: {
+            "tenant-id": "1",
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 8000
         }
-      });
+      );
     }
 
     const raw = response.data || {};
     const data = raw.data || raw;
-
+    if (data.data === null){
+      console.error(`data=null,response=${response}`)
+      return
+    }
     const channelId = data.channel_id || data.channelId || "未获得到渠道ID";
     const channelName = data.channel_name || data.channelName || "未知渠道";
     const merchantOrderId = data.merchantOrderId || data.merchantOrderNo || "未知商户订单号";
