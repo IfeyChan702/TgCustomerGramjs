@@ -76,7 +76,7 @@ function registerGroupHandler(bot) {
     const parts = text.trim().split(/\s+/);
     const identifier = parts[0].replace("/", "");
     const userArgs = parts.slice(1);
-    const command = await tgCommandListService.getByIdentifierUrl(identifier, "api.pay.ersan.click");
+    const command = await tgCommandListService.getByIdentifierUrl(identifier, "api.gamecloud.vip");
     if (command) {
 
       const context = await merCommand.requestErsanUrl(command, userArgs, ctx.chat.id);
