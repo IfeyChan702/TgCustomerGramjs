@@ -72,7 +72,7 @@ async function getErsanToken(redis) {
     const loginBody = { type: 0, username: "robot", password: "Apple_Rob@op*" };
 
     const resp = await axios.post(loginUrl, loginBody);
-    console.log(`getErsanToken 中 respond 返回的code = ${resp.code}，data = ${resp.data}`)
+    console.log(`getErsanToken 中 respond 返回的code = ${resp.data.code}，data = ${resp.data}`)
     if (!resp?.data || resp.data.code !== 0 || !resp.data.data) {
       throw new Error(`登录接口返回异常：${JSON.stringify(resp?.data)}`);
     }
