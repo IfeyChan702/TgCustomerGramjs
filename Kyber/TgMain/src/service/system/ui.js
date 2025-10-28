@@ -2,11 +2,32 @@
 const { Markup } = require("telegraf");
 const { sign } = require("../system/security");
 
-function approveKeyboard(orderId, merchantId) {
-  const ok = `ok|${orderId}|${merchantId}|${sign(`ok|${orderId}|${merchantId}`)}`;
-  const no = `no|${orderId}|${merchantId}|${sign(`no|${orderId}|${merchantId}`)}`;
+function approveKeyboard(orderId, merchantNo) {
+  const ok = `ok|${orderId}|${merchantNo}|${sign(`ok|${orderId}|${merchantNo}`)}`;
+  const no = `no|${orderId}|${merchantNo}|${sign(`no|${orderId}|${merchantNo}`)}`;
   return Markup.inlineKeyboard([
     [Markup.button.callback("✅ 同意", ok), Markup.button.callback("❌ 拒绝", no)]
+  ]);
+}
+
+function auditKeyboard(
+  orderId,
+  merchantNo,
+  merchantName,
+  currency,
+  amount,
+  balanceAvailable,
+  usdtAddress,
+  addressHint,
+  exchangeRate,
+  usdtFinal,
+  isSameAddress = true,
+  optType
+) {
+  const okAudit = `okAudit|${orderId}|${merchantNo}|${merchantName}|${currency}|${amount}|${balanceAvailable}|${usdtAddress}|${addressHint}|${exchangeRate}|${usdtFinal}|${isSameAddress}|${optType}|${sign(`okAudit|${orderId}|${merchantNo}`)}`;
+  const noAudit = `noAudit|${orderId}|${merchantNo}|${merchantName}|${currency}|${amount}|${balanceAvailable}|${usdtAddress}|${addressHint}|${exchangeRate}|${usdtFinal}|${isSameAddress}|${optType}|${sign(`noAudit|${orderId}|${merchantNo}`)}`;
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("✅ 确认", okAudit), Markup.button.callback("❌ 拒绝", noAudit)]
   ]);
 }
 
@@ -36,7 +57,7 @@ function formatWithdrawCard({
     `商户名: <code>${merchantName}</code>\n` +
     `申请货币: <b>${currency}</b>\n` +
     `申请时间: <code>${applyTime}</code>\n` +
-    `可用金额: <b>${balanceAvailable}</b>\n`+
+    `可用金额: <b>${balanceAvailable}</b>\n` +
     `申请金额: <b>${amount}</b>\n`;
 
   if (Number(optType) === 1) {
@@ -69,5 +90,6 @@ module.exports = {
   approvedSuffix,
   waitingReasonSuffix,
   rejectedFinal,
-  formatWithdrawCard
+  formatWithdrawCard,
+  auditKeyboard
 };

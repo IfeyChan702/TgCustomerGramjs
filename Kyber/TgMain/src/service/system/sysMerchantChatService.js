@@ -1,26 +1,36 @@
 const db = require("../../models/mysqlModel");
 
-exports.getChatIdAndReviewer = async (merchantNo, role = "audit") => {
+exports.getChatInfoByMerchant = async (merchantNo) => {
   const sql = `
-      SELECT s.chat_id, s.reviewer_ids
-      FROM sys_merchant_chat s
-      WHERE s.merchant_no = ?
-        AND s.role = ? LIMIT 1
+    SELECT s.chat_id, s.reviewer_ids, s.approve_ids
+    FROM sys_merchant_chat s
+    WHERE s.merchant_no = ?
+    LIMIT 1
   `;
-  const [rows] = await db.query(sql, [merchantNo, role]);
+  const [rows] = await db.query(sql, [merchantNo]);
   if (!rows?.length) return null;
 
   const row = rows[0];
-  let reviewerIds = [];
-  if (row.reviewer_ids) {
+
+  // 通用的 JSON 字段解析函数
+  const parseJsonIds = (value) => {
+    if (!value) return [];
     try {
-      const arr = typeof row.reviewer_ids === "string" ? JSON.parse(row.reviewer_ids) : row.reviewer_ids;
-      reviewerIds = (arr || []).map((x) => Number(x)).filter((x) => Number.isFinite(x));
+      const arr = typeof value === "string" ? JSON.parse(value) : value;
+      return (arr || []).map((x) => Number(x)).filter((x) => Number.isFinite(x));
     } catch (e) {
-      reviewerIds = [];
+      return [];
     }
-  }
-  return { chatId: Number(row.chat_id), reviewerIds };
+  };
+
+  const reviewerIds = parseJsonIds(row.reviewer_ids);
+  const approveIds = parseJsonIds(row.approve_ids);
+
+  return {
+    chatId: Number(row.chat_id),
+    reviewerIds,
+    approveIds,
+  };
 };
 
 exports.getMerchantNoByChatId = async (chatId) => {
