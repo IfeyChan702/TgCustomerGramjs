@@ -83,6 +83,7 @@ function registerGroupHandler(bot) {
 
       if (!context) return next?.();
 
+      console.warn(`[group]  context=${context}`);
       return ctx.reply(context, {
         parse_mode: "HTML"
       });
