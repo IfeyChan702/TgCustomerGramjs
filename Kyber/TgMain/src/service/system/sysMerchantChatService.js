@@ -37,12 +37,18 @@ exports.getMerchantNoByChatId = async (chatId) => {
   console.log("查询 chatId =", chatId, "类型 =", typeof chatId);
 
   const sql = `
-      SELECT merchant_no
+      SELECT merchant_no, merchant_name
       FROM sys_merchant_chat
       WHERE chat_id = ?
   `;
   const [rows] = await db.query(sql, [chatId]);
   console.log('rows =', rows);
 
-  return (rows || []).map(r => r?.merchant_no).filter(Boolean);
+  // 返回带商户名和商户号的数组
+  return (rows || [])
+    .filter(r => r?.merchant_no && r?.merchant_name)
+    .map(r => ({
+      merchantNo: r.merchant_no,
+      merchantName: r.merchant_name
+    }));
 };

@@ -16,8 +16,8 @@ async function requestErsanUrl(command, userArgs, chatId) {
       return;
     }
 
-    const merchantNos = await sysMerchantChatService.getMerchantNoByChatId(String(chatId));
-    if (!merchantNos?.length) {
+    const merchants = await sysMerchantChatService.getMerchantNoByChatId(String(chatId));
+    if (!merchants?.length) {
       console.warn(`[merCommand requestErsanUrl] 找不到 merchantNo, chatId=`, chatId);
       return;
     }
@@ -94,15 +94,19 @@ async function requestErsanUrl(command, userArgs, chatId) {
     // ===== balance 命令：对所有商户调用并拼接 =====
     if (isBalanceCommand) {
       const results = [];
-      for (const merchantNo of merchantNos) {
+      for (const { merchantNo, merchantName } of merchants) {
         const { result, orderNotFound } = await doRequest(merchantNo);
         if (result) {
-          results.push(`商户 ${merchantNo}：\n${result}`);
+          results.push(`商户 ${merchantName}：\n${result}`);
         } else if (orderNotFound) {
-          results.push(`商户 ${merchantNo}：订单不存在`);
+          results.push(`商户 ${merchantName}：订单不存在`);
         } else {
-          results.push(`商户 ${merchantNo}：未查到数据`);
+          console.warn(`商户 ${merchantName}(${merchantNo}) 未查到数据`);
         }
+      }
+      if (!results.length) {
+        console.warn("[merCommand requestErsanUrl] 所有商户都未查到数据");
+        return;
       }
       return results.join("\n\n------------------\n\n");
     }
