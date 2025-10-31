@@ -82,8 +82,7 @@ function registerGroupHandler(bot) {
       const context = await merCommand.requestErsanUrl(command, userArgs, ctx.chat.id);
 
       if (!context) return next?.();
-
-      console.warn(`[group]  context=${context}`);
+      console.log(`[group]中的context为${context}`);
       return ctx.reply(context, {
         parse_mode: "HTML"
       });
