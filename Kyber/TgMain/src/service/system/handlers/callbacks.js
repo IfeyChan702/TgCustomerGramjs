@@ -2,7 +2,8 @@
 const { verify } = require("../security");
 const { callbackBackend, callbackAppStatus } = require("../backend");
 const { tryDecide, isDecided, isReviewer, getReviewStatus, saveReviewStatus, isApprover } = require("../reviewStore");
-const { approvedSuffix, approveKeyboard, formatWithdrawCard } = require("../ui");
+const { approvedSuffix, approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../ui");
+const sysWithdrawContextService = require("../sysWithdrawContextService")
 
 function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
@@ -13,7 +14,6 @@ function registerCallbackHandler(bot) {
       const orderId = parts[1];
       const merchantNo = parts[2];
       const sig = parts[parts.length - 1];
-      const extraFields = parts.slice(3, -1);
       if (!/^M\d{14,30}$/.test(merchantNo)) {
         return await ctx.answerCbQuery("商户NO格式错误", { show_alert: true });
       }
@@ -34,8 +34,19 @@ function registerCallbackHandler(bot) {
 
       let merchantName, currency, amount, balanceAvailable, usdtAddress, addressHint, exchangeRate, usdtFinal,
         isSameAddress, optType;
+
       if (action === "okAudit") {
-        [
+
+        if (!(await isReviewer(orderId, ctx.from.id))) {
+          return await ctx.answerCbQuery("你没有审核权限", { show_alert: true });
+        }
+
+        const info = await getWithdrawInfo(orderId, merchantNo);
+
+        if (!info) {
+          return await ctx.answerCbQuery("未找到提现记录，请联系管理员", { show_alert: true });
+        }
+        const {
           merchantName,
           currency,
           amount,
@@ -45,20 +56,10 @@ function registerCallbackHandler(bot) {
           exchangeRate,
           usdtFinal,
           isSameAddress,
-          optType
-        ] = extraFields;
+          optType,
+          applyTime
+        } = info;
 
-        amount = Number(amount);
-        balanceAvailable = Number(balanceAvailable);
-        exchangeRate = Number(exchangeRate);
-        usdtFinal = Number(usdtFinal);
-        isSameAddress = isSameAddress === "true" || isSameAddress === true;
-        optType = Number(optType);
-      }
-      if (action === "okAudit") {
-        if (!(await isReviewer(orderId, ctx.from.id))) {
-          return await ctx.answerCbQuery("你没有审核权限", { show_alert: true });
-        }
 
         const ok = await callbackAppStatus(orderId, approver, 1);
 
@@ -74,20 +75,27 @@ function registerCallbackHandler(bot) {
           orderId,
           merchantName,
           currency,
-          applyTime: ts,
+          applyTime: applyTime,
           amount: amount,
           balanceAvailable,
           usdtAddress,
+          addressHint,
           exchangeRate,
           usdtFinal,
           isSameAddress,
           optType
         });
 
-        await ctx.telegram.sendMessage(ctx.chat.id, nextMsg, {
-          parse_mode: "HTML",
-          reply_markup: approveKeyboard(orderId, merchantName)
-        });
+        await ctx.telegram.sendMessage(
+          newText,
+          {
+            parse_mode: "HTML",
+            ...approveKeyboard(
+              String(orderId),
+              String(merchantNo)
+            )
+          }
+        );
 
         return;
       }
@@ -232,5 +240,31 @@ function registerCallbackHandler(bot) {
     }
   });
 }
+async function getWithdrawInfo(orderId, merchantNo) {
+  try {
+    const data = await sysWithdrawContextService.findByOrderIdAndMerchantNo(orderId, merchantNo);
+    if (!data) {
+      console.warn(`[getWithdrawInfo] 未找到记录: orderId=${orderId}, merchantNo=${merchantNo}`);
+      return null;
+    }
 
+    return {
+      merchantName: data.merchantName,
+      currency: data.currency,
+      amount: Number(data.amount),
+      balanceAvailable: Number(data.balanceAvailable),
+      usdtAddress: data.usdtAddress || "",
+      addressHint: data.addressHint || "",
+      exchangeRate: Number(data.exchangeRate),
+      usdtFinal: Number(data.usdtFinal),
+      isSameAddress: data.isSameAddress === 1 || data.isSameAddress === true,
+      optType: Number(data.optType),
+      applyTime: data.applyTime,
+      status: data.status
+    };
+  } catch (err) {
+    console.error("[getWithdrawInfo] 查询数据库失败:", err);
+    return null;
+  }
+}
 module.exports = { registerCallbackHandler };

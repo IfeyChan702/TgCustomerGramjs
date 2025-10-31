@@ -4,6 +4,8 @@ const { approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../../se
 const { success, fail } = require("../../utils/responseWrapper");
 const merChatService = require("../../service/system/sysMerchantChatService");
 const router = express.Router();
+const { redis } = require("../../models/redisModel");
+const withdrawContextService = require("../../service/system/sysWithdrawContextService");
 /**
  * POST /withdrawals/create
  * body = {
@@ -96,6 +98,34 @@ module.exports = function createWithdrawalsRouter(bot) {
       await setReviewers(orderId, reviewerIds, 1);
 
       await setApprovers(orderId, approveIds, isSameAddress ? 1 : 2);
+
+      const withdrawData = {
+        merchantNo,
+        merchantName,
+        orderId,
+        amount,
+        currency,
+        balanceAvailable,
+        usdtAddress,
+        addressHint,
+        exchangeRate,
+        usdtFinal,
+        applyTime: formattedApplyTime,
+        optType,
+        isSameAddress,
+      };
+
+      const exist = await withdrawContextService.findByOrderIdAndMerchantNo(orderId, merchantNo);
+      if (exist) {
+        return res.json(fail("这个商户的这笔订单已经提交过，请勿重复提交"));
+      }
+
+      const result = await withdrawContextService.insert(withdrawData);
+
+      if (!result || result.affectedRows <= 0) {
+        console.warn("createWithdrawalsRouter 插入/更新失败:", withdrawData);
+        return res.json(fail("保存提现记录失败"));
+      }
 
       const text = formatWithdrawCard({
         orderId: esc(orderId),

@@ -8,7 +8,7 @@ const keyApprovers = (orderId) => `approvers:${orderId}`;
 const keyStageStatus = (stage, orderId) => `reviewers:status${stage}:${orderId}`;
 const keyPending = (userId) => `pending:${userId}`;
 
-async function tryDecided(orderId, ttlSec = 2 * 3600) {
+async function tryDecide(orderId, ttlSec = 2 * 3600) {
   return (await redis.set(keyDecided(orderId), "1", { NX: true, EX: ttlSec })) === "OK";
 }
 
@@ -29,7 +29,7 @@ async function setReviewers(orderId, reviewerIds = [], needCount = 1) {
   await redis.hSet(sKey, {
     needCount,
     decided: 0,
-    approvedBy: JSON.Stringify([])
+    approvedBy: JSON.stringify([])
   });
   await redis.expire(sKey, 7 * 24 * 3600);
 }

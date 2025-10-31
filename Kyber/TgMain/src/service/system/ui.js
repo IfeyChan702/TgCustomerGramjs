@@ -10,22 +10,9 @@ function approveKeyboard(orderId, merchantNo) {
   ]);
 }
 
-function auditKeyboard(
-  orderId,
-  merchantNo,
-  merchantName,
-  currency,
-  amount,
-  balanceAvailable,
-  usdtAddress,
-  addressHint,
-  exchangeRate,
-  usdtFinal,
-  isSameAddress = true,
-  optType
-) {
-  const okAudit = `okAudit|${orderId}|${merchantNo}|${merchantName}|${currency}|${amount}|${balanceAvailable}|${usdtAddress}|${addressHint}|${exchangeRate}|${usdtFinal}|${isSameAddress}|${optType}|${sign(`okAudit|${orderId}|${merchantNo}`)}`;
-  const noAudit = `noAudit|${orderId}|${merchantNo}|${merchantName}|${currency}|${amount}|${balanceAvailable}|${usdtAddress}|${addressHint}|${exchangeRate}|${usdtFinal}|${isSameAddress}|${optType}|${sign(`noAudit|${orderId}|${merchantNo}`)}`;
+function auditKeyboard(orderId, merchantNo) {
+  const okAudit = `okAudit|${orderId}|${merchantNo}|${sign(`okAudit|${orderId}|${merchantNo}`)}`;
+  const noAudit = `noAudit|${orderId}|${merchantNo}|${sign(`noAudit|${orderId}|${merchantNo}`)}`;
   return Markup.inlineKeyboard([
     [Markup.button.callback("✅ 确认", okAudit), Markup.button.callback("❌ 拒绝", noAudit)]
   ]);
