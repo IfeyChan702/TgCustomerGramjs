@@ -108,7 +108,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
         console.warn("[merCommand requestErsanUrl] 所有商户都未查到数据");
         return;
       }
-      return results.join("\n\n------------------\n\n");
+      return results.join("\n\n=============================\n\n");
     }
 
     // ===== 非 balance 命令逻辑 =====
