@@ -22,7 +22,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
       return;
     }
 
-    const isBalanceCommand = /balance2/i.test(command.identifier);
+    const isBalanceCommand = /balance/i.test(command.identifier);
 
     const params = await tgDbService.getParamsByCommandId(command.id) || [];
     const requiredParams = params.filter(p => p.required === 1);
