@@ -3,11 +3,34 @@ const { Markup } = require("telegraf");
 const { sign } = require("../system/security");
 
 function approveKeyboard(orderId, merchantNo) {
-  const ok = `ok|${orderId}|${merchantNo}|${sign(`ok|${orderId}|${merchantNo}`)}`;
-  const no = `no|${orderId}|${merchantNo}|${sign(`no|${orderId}|${merchantNo}`)}`;
-  return Markup.inlineKeyboard([
-    [Markup.button.callback("✅ 同意", ok), Markup.button.callback("❌ 拒绝", no)]
-  ]);
+  // 确保 sign 函数正常
+  const okSig = sign ? sign(`ok|${orderId}|${merchantNo}`) : "dummy";
+  const noSig = sign ? sign(`no|${orderId}|${merchantNo}`) : "dummy";
+
+  const ok = `ok|${orderId}|${merchantNo}|${okSig}`;
+  const no = `no|${orderId}|${merchantNo}|${noSig}`;
+
+  console.log("[DEBUG] approveKeyboard 返回:", {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "同意", callback_data: ok },
+          { text: "拒绝", callback_data: no }
+        ]
+      ]
+    }
+  });
+
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "同意", callback_data: ok },
+          { text: "拒绝", callback_data: no }
+        ]
+      ]
+    }
+  };
 }
 
 function auditKeyboard(orderId, merchantNo) {
@@ -58,6 +81,39 @@ function formatWithdrawCard({
   return text;
 }
 
+function formatOrderCard({
+                           orderId,
+                           merchantName,
+                           optType,           // freeze | rebate | adjust
+                           amount,
+                           currency,
+                           balanceBefore,
+                           balanceAfter,
+                           remark = "",
+                           applyTime,
+                           operator
+                         }) {
+  const OPT = {
+    freeze: { title: "冻结资金" },
+    rebate: { title: "发放回扣" },
+    adjust: { title: "手动调账" }
+  };
+
+  const config = OPT[optType] || OPT.adjust;
+  const remarkLine = remark ? `\n<strong>备注：</strong> ${remark}` : "";
+
+  return `<b>${config.title}</b>\n\n` +
+    `<strong>订单号：</strong> <code>${orderId}</code>\n` +
+    `<strong>商户：</strong> <code>${merchantName}</code>\n` +
+    `<strong>操作人：</strong> <code>${operator}</code>\n` +
+    `<strong>时间：</strong> <code>${applyTime}</code>\n\n` +
+    `<strong>金额：</strong> <b>${amount}</b> ${currency}\n` +
+    `<strong>操作前：</strong> <b>${balanceBefore}</b> ${currency}\n` +
+    `<strong>操作后：</strong> <b>${balanceAfter}</b> ${currency}\n` +
+    `${remarkLine}`;
+}
+
+
 function approvedSuffix(ts) {
   return `\n\n✅ 提现申请已确认,请稍等! \n时间：${ts}`;
 }
@@ -78,5 +134,6 @@ module.exports = {
   waitingReasonSuffix,
   rejectedFinal,
   formatWithdrawCard,
-  auditKeyboard
+  auditKeyboard,
+  formatOrderCard
 };

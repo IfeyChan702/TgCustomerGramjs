@@ -1,6 +1,6 @@
 const express = require("express");
 const { setReviewers, setApprovers } = require("../../service/system/reviewStore");
-const { approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../../service/system/ui");
+const { approveKeyboard, formatWithdrawCard, auditKeyboard,formatOrderCard } = require("../../service/system/ui");
 const { success, fail } = require("../../utils/responseWrapper");
 const merChatService = require("../../service/system/sysMerchantChatService");
 const router = express.Router();
@@ -169,6 +169,65 @@ module.exports = function createWithdrawalsRouter(bot) {
       console.error(err);
       return res.json(fail("系统维护中。。"));
     }
+  });
+
+  router.post("/order/create", async (req, res) => {
+    const {
+      merchantNo,
+      merchantName,
+      orderId,
+      optType,           // freeze | rebate | adjust
+      amount,
+      currency,
+      balanceBefore,
+      balanceAfter,
+      remark = "",
+      applyTime,
+      operator
+    } = req.body || {};
+    try {
+      const required = { merchantNo, merchantName, orderId, optType, amount, currency, balanceBefore,balanceAfter, operator };
+      const missing = Object.entries(required)
+        .filter(([_, v]) => v === undefined || v === null || String(v).trim() === "")
+        .map(([k]) => k);
+
+      if (missing.length > 0) {
+        return res.json(fail(`缺少必填参数: ${missing.join(", ")}`));
+      }
+
+      if (!["freeze", "rebate", "adjust"].includes(optType)) {
+        return res.json(fail("optType 必须是: freeze, rebate, adjust"));
+      }
+
+      const chatInfo = await merChatService.getChatInfoByMerchant(merchantNo);
+      if (!chatInfo?.chatId) {
+        return res.json(fail("商户未配置 TG 群聊"));
+      }
+      const { chatId, reviewerIds, approveIds } = chatInfo;
+      const applyTimeStr = formatDate(applyTime || Date.now());
+
+      const text = formatOrderCard({
+        orderId,
+        merchantName,
+        optType,
+        amount,
+        currency,
+        balanceBefore,
+        balanceAfter,
+        remark,
+        applyTime: applyTimeStr,
+        operator
+      });
+
+      await bot.telegram.sendMessage(chatId, text, {
+        parse_mode: "HTML",
+        ...approveKeyboard(orderId,merchantNo)
+      })
+      return res.json(success("提交成功"));
+    }catch (err) {
+    console.error("[/order/create] error:", err);
+    return res.json(fail("系统异常"));
+  }
   });
 
   return router;
