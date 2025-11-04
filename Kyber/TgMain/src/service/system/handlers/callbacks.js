@@ -22,10 +22,6 @@ function registerCallbackHandler(bot) {
         return await ctx.answerCbQuery("签名校验失败", { show_alert: true });
       }
 
-      if (!(await isReviewer(orderId, ctx.from.id))) {
-        return await ctx.answerCbQuery("你没有审核权限", { show_alert: true });
-      }
-
       const approver = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
       const ts = new Date().toLocaleString();
       const approverId = ctx.from.id;
@@ -80,7 +76,8 @@ function registerCallbackHandler(bot) {
           exchangeRate,
           usdtFinal,
           isSameAddress,
-          optType
+          optType,
+          isConfirmInfo:false
         });
 
         await ctx.reply(
@@ -221,7 +218,7 @@ function registerCallbackHandler(bot) {
         }
         const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
         const newText =
-          original + `\n\n <b>❌ 提现申请被拒绝</b> \n时间: ${ts}`;
+          original + `\n\n <b>❌ 订单被拒绝</b> \n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
         return;
       }
