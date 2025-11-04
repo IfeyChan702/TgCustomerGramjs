@@ -1,7 +1,7 @@
 // handlers/callbacks.js
 const { verify } = require("../security");
 const { callbackBackend, callbackAppStatus } = require("../backend");
-const { tryDecide, isDecided, isReviewer, getReviewStatus, saveReviewStatus, isApprover } = require("../reviewStore");
+const { tryDecide, isDecided, isReviewer, getStageStatus, saveStageStatus, isApprover } = require("../reviewStore");
 const { approvedSuffix, approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../ui");
 const sysWithdrawContextService = require("../sysWithdrawContextService")
 
@@ -31,9 +31,6 @@ function registerCallbackHandler(bot) {
       const approverId = ctx.from.id;
 
       await ctx.answerCbQuery("处理中…");
-
-      let merchantName, currency, amount, balanceAvailable, usdtAddress, addressHint, exchangeRate, usdtFinal,
-        isSameAddress, optType;
 
       if (action === "okAudit") {
 
@@ -86,8 +83,8 @@ function registerCallbackHandler(bot) {
           optType
         });
 
-        await ctx.telegram.sendMessage(
-          newText,
+        await ctx.reply(
+          nextMsg,
           {
             parse_mode: "HTML",
             ...approveKeyboard(
@@ -130,7 +127,7 @@ function registerCallbackHandler(bot) {
         }
 
         // 读取审核状态
-        const reviewInfo = await getReviewStatus(orderId);
+        const reviewInfo = await getStageStatus(orderId, "approve");
         if (!reviewInfo) {
           return await ctx.answerCbQuery("订单状态异常，请联系管理员", { show_alert: true });
         }
@@ -150,7 +147,7 @@ function registerCallbackHandler(bot) {
         // 添加本次审核人
         approved.push(approverId);
         reviewInfo.approvedBy = approved;
-        await saveReviewStatus(orderId, reviewInfo);
+        await saveStageStatus(orderId, "approve",reviewInfo);
 
         const currentCount = approved.length;
 
@@ -179,7 +176,7 @@ function registerCallbackHandler(bot) {
 
         // 达到确认人数，进入最终通过流程
         reviewInfo.decided = true;
-        await saveReviewStatus(orderId, reviewInfo);
+        await saveStageStatus(orderId,"complete", reviewInfo);
 
         const got = await tryDecide(orderId);
         if (!got) return; // 幂等控制
@@ -248,6 +245,10 @@ async function getWithdrawInfo(orderId, merchantNo) {
       return null;
     }
 
+    const time = new Date(data.applyTime)
+      .toLocaleString('en-CA', { timeZone: 'Asia/Kolkata', hour12: false })
+      .replace(', ', ' ');
+
     return {
       merchantName: data.merchantName,
       currency: data.currency,
@@ -259,7 +260,7 @@ async function getWithdrawInfo(orderId, merchantNo) {
       usdtFinal: Number(data.usdtFinal),
       isSameAddress: data.isSameAddress === 1 || data.isSameAddress === true,
       optType: Number(data.optType),
-      applyTime: data.applyTime,
+      applyTime: time,
       status: data.status
     };
   } catch (err) {
