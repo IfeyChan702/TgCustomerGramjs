@@ -139,7 +139,8 @@ module.exports = function createWithdrawalsRouter(bot) {
         exchangeRate: esc(exchangeRate),
         usdtFinal: esc(usdtFinal),
         isSameAddress,
-        optType: esc(optType)
+        optType: esc(optType),
+        isConfirmInfo:true
       });
 
       await bot.telegram.sendMessage(
@@ -175,8 +176,9 @@ module.exports = function createWithdrawalsRouter(bot) {
     const {
       merchantNo,
       merchantName,
+      accountNo,
       orderId,
-      optType,           // freeze | rebate | adjust
+      optType,           // 1:加款、2：扣款、3投诉
       amount,
       currency,
       balanceBefore,
@@ -186,7 +188,7 @@ module.exports = function createWithdrawalsRouter(bot) {
       operator
     } = req.body || {};
     try {
-      const required = { merchantNo, merchantName, orderId, optType, amount, currency, balanceBefore,balanceAfter, operator };
+      const required = { merchantNo, merchantName, orderId, optType, amount, currency, balanceBefore,balanceAfter, operator,accountNo };
       const missing = Object.entries(required)
         .filter(([_, v]) => v === undefined || v === null || String(v).trim() === "")
         .map(([k]) => k);
@@ -195,8 +197,8 @@ module.exports = function createWithdrawalsRouter(bot) {
         return res.json(fail(`缺少必填参数: ${missing.join(", ")}`));
       }
 
-      if (!["freeze", "rebate", "adjust"].includes(optType)) {
-        return res.json(fail("optType 必须是: freeze, rebate, adjust"));
+      if (![1,2,3].includes(optType)) {
+        return res.json(fail("optType 必须是: 1,2,3"));
       }
 
       const chatInfo = await merChatService.getChatInfoByMerchant(merchantNo);
@@ -205,7 +207,7 @@ module.exports = function createWithdrawalsRouter(bot) {
       }
       const { chatId, reviewerIds, approveIds } = chatInfo;
       const applyTimeStr = formatDate(applyTime || Date.now());
-
+      await setApprovers(orderId, approveIds, 1);
       const text = formatOrderCard({
         orderId,
         merchantName,
@@ -216,7 +218,8 @@ module.exports = function createWithdrawalsRouter(bot) {
         balanceAfter,
         remark,
         applyTime: applyTimeStr,
-        operator
+        operator,
+        accountNo
       });
 
       await bot.telegram.sendMessage(chatId, text, {

@@ -53,11 +53,19 @@ function formatWithdrawCard({
                               exchangeRate,
                               usdtFinal,
                               isSameAddress = true,
-                              optType
+                              optType,
+                              isConfirmInfo = true
                             }) {
-  const confirmText = isSameAddress
-    ? "请一位老板确认回U地址及申请"
-    : "⚠️ 回U地址与上次不一致，请两位老板确认！";
+
+  let confirmText
+  if (isConfirmInfo){
+    confirmText= "\n请审核提现订单是否正确"
+  }else {
+    confirmText = isSameAddress
+      ? "\n请一位老板确认回U地址及申请"
+      : "\n⚠️ 回U地址与上次不一致，请两位老板确认！";
+  }
+
 
   const usdtAmountLine = `${amount} / ${exchangeRate} = ${usdtFinal}`;
 
@@ -91,12 +99,13 @@ function formatOrderCard({
                            balanceAfter,
                            remark = "",
                            applyTime,
-                           operator
+                           operator,
+                           accountNo
                          }) {
   const OPT = {
-    freeze: { title: "冻结资金" },
-    rebate: { title: "发放回扣" },
-    adjust: { title: "手动调账" }
+    1: { title: "加款" },
+    2: { title: "扣款" },
+    3: { title: "投诉" }
   };
 
   const config = OPT[optType] || OPT.adjust;
@@ -105,6 +114,7 @@ function formatOrderCard({
   return `<b>${config.title}</b>\n\n` +
     `<strong>订单号：</strong> <code>${orderId}</code>\n` +
     `<strong>商户：</strong> <code>${merchantName}</code>\n` +
+    `<strong>账户号：</strong> <code>${accountNo}</code>\n` +
     `<strong>操作人：</strong> <code>${operator}</code>\n` +
     `<strong>时间：</strong> <code>${applyTime}</code>\n\n` +
     `<strong>金额：</strong> <b>${amount}</b> ${currency}\n` +
@@ -115,7 +125,7 @@ function formatOrderCard({
 
 
 function approvedSuffix(ts) {
-  return `\n\n✅ 提现申请已确认,请稍等! \n时间：${ts}`;
+  return `\n\n✅ 订单已确认,请稍等! \n时间：${ts}`;
 }
 
 function waitingReasonSuffix() {
