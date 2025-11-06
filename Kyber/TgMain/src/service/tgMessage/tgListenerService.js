@@ -177,7 +177,7 @@ async function handleEvent(client, event, isRunning) {
           return false;
         }
         if (await isAuthorized(command, chatId)) {
-          if (command.url.includes("api.pay.ersan.click")) {
+          if (command.url.includes("adm.gamecloud.vip")) {
             console.log("这个命令是调用军哥支付平台的接口:", command.url);
             /*await handleOrder.requestErsanUrl(command, userArgs, message.message, client, chatId);*/
             return true;

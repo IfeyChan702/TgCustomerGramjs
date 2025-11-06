@@ -4,7 +4,7 @@ const { getErsanToken } = require("../../service/handle/handleOrder");
 const { redis } = require("../../models/redisModel");
 
 async function callbackBackend(applicationNo, approver, status) {
-  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
+  const url = `https://adm.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
   try {
     const token = await getErsanToken(redis);
     const type = 4;
@@ -38,7 +38,7 @@ async function callbackBackend(applicationNo, approver, status) {
 }
 
 async function callbackAccountStatus(applicationNo, approver, status, type) {
-  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
+  const url = `https://adm.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
   try {
     if (![1, 2, 3].includes(type)) {
       console.error("type 必须是 1、2 或 3");
@@ -75,7 +75,7 @@ async function callbackAccountStatus(applicationNo, approver, status, type) {
 }
 
 async function callbackAppStatus(applicationNo, confirmer, confirmStatus) {
-  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/mchCheck`;
+  const url = `https://adm.gamecloud.vip/admin-api/plt/tg/withdraw/mchCheck`;
   try {
     const token = await getErsanToken(redis);
     const res = await axios.put(
