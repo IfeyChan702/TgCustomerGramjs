@@ -97,7 +97,7 @@ module.exports = function createWithdrawalsRouter(bot) {
 
       await setReviewers(orderId, reviewerIds, 1);
 
-      await setApprovers(orderId, approveIds, isSameAddress ? 1 : 2);
+      await setApprovers(orderId, approveIds, 1);
 
       const withdrawData = {
         merchantNo,
@@ -112,7 +112,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         usdtFinal,
         applyTime: formattedApplyTime,
         optType,
-        isSameAddress,
+        isSameAddress
       };
 
       const exist = await withdrawContextService.findByOrderIdAndMerchantNo(orderId, merchantNo);
@@ -185,7 +185,8 @@ module.exports = function createWithdrawalsRouter(bot) {
       balanceAfter,
       remark = "",
       applyTime,
-      operator
+      operator,
+      channelName
     } = req.body || {};
     try {
       const required = { merchantNo, merchantName, orderId, optType, amount, currency, balanceBefore,balanceAfter, operator,accountNo };
@@ -219,12 +220,13 @@ module.exports = function createWithdrawalsRouter(bot) {
         remark,
         applyTime: applyTimeStr,
         operator,
-        accountNo
+        accountNo,
+        channelName
       });
 
       await bot.telegram.sendMessage(chatId, text, {
         parse_mode: "HTML",
-        ...approveKeyboard(orderId,merchantNo)
+        ...approveKeyboard(orderId,merchantNo,optType)
       })
       return res.json(success("提交成功"));
     }catch (err) {

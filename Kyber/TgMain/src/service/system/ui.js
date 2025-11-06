@@ -2,13 +2,13 @@
 const { Markup } = require("telegraf");
 const { sign } = require("../system/security");
 
-function approveKeyboard(orderId, merchantNo) {
+function approveKeyboard(orderId, merchantNo, type) {//type(0是提现，1:加款、2：扣款、3投诉)
   // 确保 sign 函数正常
   const okSig = sign ? sign(`ok|${orderId}|${merchantNo}`) : "dummy";
   const noSig = sign ? sign(`no|${orderId}|${merchantNo}`) : "dummy";
 
-  const ok = `ok|${orderId}|${merchantNo}|${okSig}`;
-  const no = `no|${orderId}|${merchantNo}|${noSig}`;
+  const ok = `ok|${orderId}|${merchantNo}|${type}|${okSig}`;
+  const no = `no|${orderId}|${merchantNo}|${type}|${noSig}`;
 
   console.log("[DEBUG] approveKeyboard 返回:", {
     reply_markup: {
@@ -57,13 +57,13 @@ function formatWithdrawCard({
                               isConfirmInfo = true
                             }) {
 
-  let confirmText
-  if (isConfirmInfo){
-    confirmText= "\n请审核提现订单是否正确"
-  }else {
+  let confirmText;
+  if (isConfirmInfo) {
+    confirmText = "\n请审核提现订单是否正确";
+  } else {
     confirmText = isSameAddress
-      ? "\n请一位老板确认回U地址及申请"
-      : "\n⚠️ 回U地址与上次不一致，请两位老板确认！";
+      ? "\n请老板确认回U地址及申请"
+      : "\n⚠️ 回U地址与上次不一致，请老板确认！";
   }
 
 
@@ -100,7 +100,8 @@ function formatOrderCard({
                            remark = "",
                            applyTime,
                            operator,
-                           accountNo
+                           accountNo,
+                           channelName
                          }) {
   const OPT = {
     1: { title: "加款" },
@@ -111,10 +112,16 @@ function formatOrderCard({
   const config = OPT[optType] || OPT.adjust;
   const remarkLine = remark ? `\n<strong>备注：</strong> ${remark}` : "";
 
+  let channelLine = "";
+  if (optType === 3 && channelName) {
+    channelLine = `<strong>投诉渠道：</strong> <code>${channelName}</code>\n`;
+  }
+
   return `<b>${config.title}</b>\n\n` +
     `<strong>订单号：</strong> <code>${orderId}</code>\n` +
     `<strong>商户：</strong> <code>${merchantName}</code>\n` +
     `<strong>账户号：</strong> <code>${accountNo}</code>\n` +
+    channelLine +
     `<strong>操作人：</strong> <code>${operator}</code>\n` +
     `<strong>时间：</strong> <code>${applyTime}</code>\n\n` +
     `<strong>金额：</strong> <b>${amount}</b> ${currency}\n` +
