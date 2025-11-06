@@ -1,6 +1,6 @@
 // handlers/callbacks.js
 const { verify } = require("../security");
-const { callbackBackend, callbackAppStatus } = require("../backend");
+const { callbackBackend, callbackAppStatus,callbackAccountStatus } = require("../backend");
 const { tryDecide, isDecided, isReviewer, getStageStatus, saveStageStatus, isApprover } = require("../reviewStore");
 const { approvedSuffix, approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../ui");
 const sysWithdrawContextService = require("../sysWithdrawContextService")
@@ -86,7 +86,8 @@ function registerCallbackHandler(bot) {
             parse_mode: "HTML",
             ...approveKeyboard(
               String(orderId),
-              String(merchantNo)
+              String(merchantNo),
+              4
             )
           }
         );
@@ -116,6 +117,16 @@ function registerCallbackHandler(bot) {
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
         return;
       }
+
+
+      const typeStr = parts[3];
+      const type = parseInt(typeStr, 10);
+
+      if (isNaN(type)) {
+        console.error("type 不是数字:", typeStr);
+        return false;
+      }
+      let ok = false;
 
       if (action === "ok") {
 
@@ -178,7 +189,15 @@ function registerCallbackHandler(bot) {
         const got = await tryDecide(orderId);
         if (!got) return; // 幂等控制
 
-        const ok = await callbackBackend(orderId, approver, 3);
+        if (type === 4) {
+          ok = await callbackBackend(orderId, approver, 1);
+        } else if (type >= 1 && type <= 3) {
+          ok = await callbackAccountStatus(orderId, approver, 1, type);
+        } else {
+          console.error("type 超出范围，仅支持 0,1,2,3:", type);
+          return false;
+        }
+
         if (!ok) {
           try {
             await ctx.editMessageText(
@@ -205,7 +224,14 @@ function registerCallbackHandler(bot) {
         const got = await tryDecide(orderId);
         if (!got) return;
 
-        const ok = await callbackBackend(orderId, approver, 4);
+        if (type === 4) {
+          ok = await callbackBackend(orderId, approver, 2);
+        } else if (type >= 1 && type <= 3) {
+          ok = await callbackAccountStatus(orderId, approver, 2, type);
+        } else {
+          console.error("type 超出范围，仅支持 0,1,2,3:", type);
+          return false;
+        }
         if (!ok) {
           try {
             await ctx.editMessageText(
@@ -254,7 +280,7 @@ async function getWithdrawInfo(orderId, merchantNo) {
       usdtAddress: data.usdtAddress || "",
       addressHint: data.addressHint || "",
       exchangeRate: Number(data.exchangeRate),
-      usdtFinal: Number(data.usdtFinal),
+      usdtFinal: data.usdtFinal,
       isSameAddress: data.isSameAddress === 1 || data.isSameAddress === true,
       optType: Number(data.optType),
       applyTime: time,
