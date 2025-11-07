@@ -235,6 +235,23 @@ module.exports = function createWithdrawalsRouter(bot) {
   }
   });
 
+
+  router.post("/message/alarm", async (req, res) => {
+
+    const {
+      alarmMessage
+    } = req.body || {};
+    try {
+      await bot.telegram.sendMessage(-5063005051, alarmMessage, {
+        parse_mode: "HTML",
+      })
+      return res.json(success("传送成功"));
+      }catch (err) {
+      console.error("[/message/alarm] error:", err);
+      return res.json(fail("系统异常"));
+    }
+  });
+
   return router;
 };
 
