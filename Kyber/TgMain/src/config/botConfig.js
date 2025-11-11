@@ -4,7 +4,7 @@ require("dotenv").config({ path: ".env.development" });
 
 module.exports = {
   // Telegram bot token
-  botToken: process.env.CUSTOMER_BOT_TOKEN,
+  botToken: process.env.BOT_TOKEN,
 
   alarmBotToken: process.env.ALARM_BOT_TOKEN,
 
