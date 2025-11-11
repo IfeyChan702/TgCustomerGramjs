@@ -242,7 +242,7 @@ module.exports = function createWithdrawalsRouter(bot) {
       alarmMessage
     } = req.body || {};
     try {
-      await bot.telegram.sendMessage(-5063005051, alarmMessage, {
+      await bot.telegram.sendMessage(-1003256208710, alarmMessage, {
         parse_mode: "HTML",
       })
       return res.json(success("传送成功"));
