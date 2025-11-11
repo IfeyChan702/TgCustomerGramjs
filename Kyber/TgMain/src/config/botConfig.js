@@ -4,7 +4,9 @@ require("dotenv").config({ path: ".env.development" });
 
 module.exports = {
   // Telegram bot token
-  botToken: process.env.BOT_TOKEN,
+  botToken: process.env.CUSTOMER_BOT_TOKEN,
+
+  alarmBotToken: process.env.ALARM_BOT_TOKEN,
 
   // 如果你还需要用 telegram API_ID / API_HASH（tdlib 或 gramjs 才会用到）
   apiId: process.env.API_ID ? Number(process.env.API_ID) : undefined,

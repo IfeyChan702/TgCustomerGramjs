@@ -130,6 +130,18 @@ function formatOrderCard({
     `${remarkLine}`;
 }
 
+function formatInternalRequestCard({ orderId, amount, currency, applyTime, operator, remark }) {
+  return [
+    `💼 <b>内部请款</b>`,
+    `────────────────────`,
+    `🧾 单号：<code>${orderId}</code>`,
+    `💵 金额：<b>${amount} ${currency}</b>`,
+    `🕒 申请时间：${applyTime}`,
+    `👤 申请人：${operator}`,
+    remark ? `📝 备注：${remark}` : null
+  ].filter(Boolean).join("\n");
+}
+
 
 function approvedSuffix(ts) {
   return `\n\n✅ 订单已确认,请稍等! \n时间：${ts}`;
@@ -152,5 +164,6 @@ module.exports = {
   rejectedFinal,
   formatWithdrawCard,
   auditKeyboard,
-  formatOrderCard
+  formatOrderCard,
+  formatInternalRequestCard
 };

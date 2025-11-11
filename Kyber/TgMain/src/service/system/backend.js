@@ -1,5 +1,4 @@
 const axios = require("axios");
-const { backendBase, backendToken } = require("../../config/botConfig");
 const { getErsanToken } = require("../../service/handle/handleOrder");
 const { redis } = require("../../models/redisModel");
 
@@ -40,8 +39,8 @@ async function callbackBackend(applicationNo, approver, status) {
 async function callbackAccountStatus(applicationNo, approver, status, type) {
   const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
   try {
-    if (![1, 2, 3].includes(type)) {
-      console.error("type 必须是 1、2 或 3");
+    if (![1, 2, 3, 5].includes(type)) {
+      console.error("type 必须是 1、2、3、5");
       return false;
     }
     const token = await getErsanToken(redis);

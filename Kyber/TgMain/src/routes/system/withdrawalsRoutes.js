@@ -1,6 +1,12 @@
 const express = require("express");
 const { setReviewers, setApprovers } = require("../../service/system/reviewStore");
-const { approveKeyboard, formatWithdrawCard, auditKeyboard,formatOrderCard } = require("../../service/system/ui");
+const {
+  approveKeyboard,
+  formatWithdrawCard,
+  auditKeyboard,
+  formatOrderCard,
+  formatInternalRequestCard
+} = require("../../service/system/ui");
 const { success, fail } = require("../../utils/responseWrapper");
 const merChatService = require("../../service/system/sysMerchantChatService");
 const router = express.Router();
@@ -140,7 +146,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         usdtFinal: esc(usdtFinal),
         isSameAddress,
         optType: esc(optType),
-        isConfirmInfo:true
+        isConfirmInfo: true
       });
 
       await bot.telegram.sendMessage(
@@ -173,23 +179,81 @@ module.exports = function createWithdrawalsRouter(bot) {
   });
 
   router.post("/order/create", async (req, res) => {
-    const {
-      merchantNo,
-      merchantName,
-      accountNo,
-      orderId,
-      optType,           // 1:加款、2：扣款、3投诉
-      amount,
-      currency,
-      balanceBefore,
-      balanceAfter,
-      remark = "",
-      applyTime,
-      operator,
-      channelName
-    } = req.body || {};
     try {
-      const required = { merchantNo, merchantName, orderId, optType, amount, currency, balanceBefore,balanceAfter, operator,accountNo };
+      // 1) 解构 & 规范化
+      const {
+        merchantNo,
+        merchantName,
+        accountNo,
+        orderId,
+        optType,
+        amount,
+        currency,
+        balanceBefore,
+        balanceAfter,
+        remark = "",
+        applyTime,
+        operator,
+        channelName
+      } = req.body || {};
+
+      const optTypeNum = Number(optType);
+
+      if (![1, 2, 3, 5].includes(optTypeNum)) {
+        return res.json(fail("optType 必须是: 1,2,3,5"));
+      }
+
+      if (optTypeNum === 5) {
+        const required5 = { orderId, optType: optTypeNum, amount, currency, operator };
+        const missing5 = Object.entries(required5)
+          .filter(([_, v]) => v === undefined || v === null || String(v).trim() === "")
+          .map(([k]) => k);
+        if (missing5.length > 0) {
+          return res.json(fail(`缺少必填参数: ${missing5.join(", ")}`));
+        }
+
+        const chatInfo = await merChatService.getChatInfoByMerchant("M20251111111111112233");
+        if (!chatInfo?.chatId) {
+          return res.json(fail("商户未配置 TG 群聊"));
+        }
+        const { chatId, reviewerIds, approveIds } = chatInfo;
+
+        const applyTimeStr = formatDate(applyTime || Date.now());
+
+        if (approveIds?.length) {
+          await setApprovers(orderId, approveIds, 1);
+        }
+
+        const text = formatInternalRequestCard({
+          orderId,
+          amount,
+          currency,
+          applyTime: applyTimeStr,
+          operator,
+          remark // 可省略
+        });
+
+        await bot.telegram.sendMessage(chatId, text, {
+          parse_mode: "HTML",
+          ...approveKeyboard(orderId, "M20251111111111112233", 5)
+        });
+
+        return res.json(success("提交成功"));
+      }
+
+      // ===== 这里是原有 1/2/3 的处理 =====
+      const required = {
+        merchantNo,
+        merchantName,
+        orderId,
+        optType: optTypeNum,
+        amount,
+        currency,
+        balanceBefore,
+        balanceAfter,
+        operator,
+        accountNo
+      };
       const missing = Object.entries(required)
         .filter(([_, v]) => v === undefined || v === null || String(v).trim() === "")
         .map(([k]) => k);
@@ -198,21 +262,19 @@ module.exports = function createWithdrawalsRouter(bot) {
         return res.json(fail(`缺少必填参数: ${missing.join(", ")}`));
       }
 
-      if (![1,2,3].includes(optType)) {
-        return res.json(fail("optType 必须是: 1,2,3"));
-      }
-
       const chatInfo = await merChatService.getChatInfoByMerchant(merchantNo);
       if (!chatInfo?.chatId) {
         return res.json(fail("商户未配置 TG 群聊"));
       }
       const { chatId, reviewerIds, approveIds } = chatInfo;
+
       const applyTimeStr = formatDate(applyTime || Date.now());
       await setApprovers(orderId, approveIds, 1);
+
       const text = formatOrderCard({
         orderId,
         merchantName,
-        optType,
+        optType: optTypeNum,
         amount,
         currency,
         balanceBefore,
@@ -226,13 +288,14 @@ module.exports = function createWithdrawalsRouter(bot) {
 
       await bot.telegram.sendMessage(chatId, text, {
         parse_mode: "HTML",
-        ...approveKeyboard(orderId,merchantNo,optType)
-      })
+        ...approveKeyboard(orderId, merchantNo, optTypeNum)
+      });
+
       return res.json(success("提交成功"));
-    }catch (err) {
-    console.error("[/order/create] error:", err);
-    return res.json(fail("系统异常"));
-  }
+    } catch (err) {
+      console.error("[/order/create] error:", err);
+      return res.json(fail("系统异常"));
+    }
   });
 
 
@@ -243,10 +306,10 @@ module.exports = function createWithdrawalsRouter(bot) {
     } = req.body || {};
     try {
       await bot.telegram.sendMessage(-5063005051, alarmMessage, {
-        parse_mode: "HTML",
-      })
+        parse_mode: "HTML"
+      });
       return res.json(success("传送成功"));
-      }catch (err) {
+    } catch (err) {
       console.error("[/message/alarm] error:", err);
       return res.json(fail("系统异常"));
     }

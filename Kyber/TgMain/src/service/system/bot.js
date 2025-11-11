@@ -1,7 +1,5 @@
-const express = require("express");
 const { Telegraf } = require("telegraf");
-const { startRedis } = require("../../models/redisModel");
-const { botToken, port } = require("../../config/botConfig");
+const { botToken, alarmBotToken } = require("../../config/botConfig");
 
 const { registerCallbackHandler } = require("./handlers/callbacks");
 const { registerPrivateHandler } = require("./handlers/private");
@@ -12,6 +10,8 @@ if (!botToken) {
 }
 
 const bot = new Telegraf(botToken);
+
+const alarmBot = new Telegraf(alarmBotToken);
 
 // 启动
 async function startBot() {
