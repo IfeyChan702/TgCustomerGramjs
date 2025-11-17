@@ -17,6 +17,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
     }
 
     const merchants = await sysMerchantChatService.getMerchantNoByChatId(String(chatId));
+    console.info(`[requestErsanUrl] = ${merchants}`);
     if (!merchants?.length) {
       console.warn(`[merCommand requestErsanUrl] 找不到 merchantNo, chatId=`, chatId);
       return;
@@ -28,7 +29,13 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const requiredParams = params.filter(p => p.required === 1);
     const effectiveRequiredCount = requiredParams.filter(p => !AUTO_FILLED_PARAMS.has(p.parameter_name)).length;
     if (userArgs.length < effectiveRequiredCount) {
-      console.warn(`参数不足，至少需要 ${effectiveRequiredCount} 个参数`);
+      const missing = requiredParams
+        .filter(p => !AUTO_FILLED_PARAMS.has(p.parameter_name))
+        .slice(userArgs.length)
+        .map(p => p.parameter_name)
+        .join("、");
+
+      console.warn(`参数不足，缺少：${missing}`);
       return;
     }
 
@@ -41,13 +48,39 @@ async function requestErsanUrl(command, userArgs, chatId) {
 
     // === 构造 body ===
     const buildBody = (merchantNo) => {
-      const body = {};
-      const argCount = Math.min(userArgs.length, params.length);
-      for (let i = 0; i < argCount; i++) {
-        const name = params[i].parameter_name;
-        body[name] = userArgs[i] ?? "";
-      }
-      body.merchantNo = merchantNo;
+      const body = { merchantNo };
+
+      // 1. 先处理用户可能传的「命名参数」（如：orderNo=123 amount=500）
+      userArgs.forEach(arg => {
+        if (typeof arg === 'string' && arg.includes('=')) {
+          const [key, ...valParts] = arg.split('=');
+          const value = valParts.join('=').trim(); // 支持 value 中包含 = 的情况
+          if (key && value) {
+            body[key.trim()] = value;
+          }
+        }
+      });
+
+      // 2. 再处理位置参数（传统顺序参数）
+      let positionalIndex = 0;
+      params.forEach(param => {
+        const name = param.parameter_name;
+        // 如果已经被命名参数覆盖了，就跳过
+        if (body.hasOwnProperty(name)) return;
+
+        // 否则尝试用位置参数填充
+        if (positionalIndex < userArgs.length) {
+          const arg = userArgs[positionalIndex];
+          // 如果这个位置参数看起来是「key=value」形式，就跳过（留给上面处理）
+          if (typeof arg === 'string' && arg.includes('=')) {
+            // do nothing
+          } else {
+            body[name] = arg ?? "";
+            positionalIndex++;
+          }
+        }
+      });
+
       return body;
     };
 
@@ -55,7 +88,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const doRequest = async (merchantNo) => {
       const body = buildBody(merchantNo);
       let response;
-
+      console.info(`【requestErsanUrl doRequest】${body}`)
       try {
         if (method === "GET") {
           response = await axios.get(command.url, { ...axiosCfg, params: body });
@@ -114,7 +147,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
     // ===== 非 balance 命令逻辑 =====
     let hasOrderNotFound = false;
 
-    for (const merchantNo of merchants) {
+    for (const { merchantNo } of merchants) {
       const { result, orderNotFound } = await doRequest(merchantNo);
 
       if (orderNotFound) hasOrderNotFound = true;
