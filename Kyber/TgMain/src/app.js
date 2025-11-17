@@ -13,8 +13,7 @@ const projectDataRoutes = require("./routes/project/projectDataRoutes");
 const tgParameterListRoutes = require("./routes/command/tgParameterListRoutes");
 const tgCommandListRoutes = require("./routes/command/tgCommandListRoutes");
 const tgComGroPeRoutes = require("./routes/command/tgComGroPeRoutes");
-const sysWithdrawals = require("./routes/system/withdrawalsRoutes");
-const { bot } = require("./service/system/bot");
+const tgBotsRouts = require("./routes/system/tgBotRoutes")
 
 require("./models/mysqlModel");
 const session = require("express-session");
@@ -44,6 +43,7 @@ app.use("/api", channelRoutes);
 app.use("/api", orderRoutes);
 app.use("/api", projectDataRoutes, projectRoutes);
 app.use("/api", tgCommandListRoutes, tgParameterListRoutes, tgComGroPeRoutes);
+app.use("/api", tgBotsRouts);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get("/api-docs/swagger.json", (req, res) => {

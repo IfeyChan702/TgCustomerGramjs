@@ -191,7 +191,7 @@ function registerCallbackHandler(bot) {
 
         if (type === 4) {
           ok = await callbackBackend(orderId, approver, 1);
-        } else if (type >= 1 && type <= 3) {
+        } else if ([1, 2, 3, 5].includes(type)) {
           ok = await callbackAccountStatus(orderId, approver, 1, type);
         } else {
           console.error("type 超出范围，仅支持 0,1,2,3:", type);
@@ -201,7 +201,7 @@ function registerCallbackHandler(bot) {
         if (!ok) {
           try {
             await ctx.editMessageText(
-              (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 订单处理失败，请联系客服</b>",
+              (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 订单处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
           } catch {
@@ -226,7 +226,7 @@ function registerCallbackHandler(bot) {
 
         if (type === 4) {
           ok = await callbackBackend(orderId, approver, 2);
-        } else if (type >= 1 && type <= 3) {
+        } else if ([1, 2, 3, 5].includes(type)) {
           ok = await callbackAccountStatus(orderId, approver, 2, type);
         } else {
           console.error("type 超出范围，仅支持 0,1,2,3:", type);
