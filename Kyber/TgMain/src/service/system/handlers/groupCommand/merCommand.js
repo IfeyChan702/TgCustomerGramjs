@@ -114,7 +114,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
     // ===== 非 balance 命令逻辑 =====
     let hasOrderNotFound = false;
 
-    for (const merchantNo of merchantNos) {
+    for (const merchantNo of merchants) {
       const { result, orderNotFound } = await doRequest(merchantNo);
 
       if (orderNotFound) hasOrderNotFound = true;
