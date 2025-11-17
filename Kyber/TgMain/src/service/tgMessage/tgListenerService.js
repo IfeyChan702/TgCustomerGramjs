@@ -356,9 +356,9 @@ async function handleMerchantOrderMessage(client, chatId, message) {
       await client.sendMessage(orderChatId, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
       const errorSentMsg = await client.sendFile(orderChatId, {
         file: message.media,
-        caption: `${merchantOrderId}`
+        caption: `${orderNo}`
       });
-      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, merchantOrderId);
+      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, orderNo);
       return;
     }
     // 群发图片
@@ -366,10 +366,10 @@ async function handleMerchantOrderMessage(client, chatId, message) {
       try {
         const sentMsg = await client.sendFile(targetChatId, {
           file: message.media,
-          caption: `${merchantOrderId}`
+          caption: `${orderNo}`
         });
 
-        await addOrUpdateOrder(sentMsg.id, message.id, chatId, channelId, merchantOrderId);
+        await addOrUpdateOrder(sentMsg.id, message.id, chatId, channelId, orderNo);
 
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
