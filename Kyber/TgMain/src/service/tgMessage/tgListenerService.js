@@ -292,7 +292,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
   }
 
   await client.sendMessage(chatId, {
-    message: "客户请等待，现在为你查询订单",
+    message: "请稍等，现在为您查询订单",
     replyTo: message.id
   });
 
