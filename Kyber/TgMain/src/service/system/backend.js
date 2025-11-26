@@ -7,6 +7,26 @@ async function callbackBackend(applicationNo, approver, status) {
   try {
     const token = await getErsanToken(redis);
     const type = 4;
+    const method = "PUT";
+
+    const payload = {
+      applicationNo,
+      approver,
+      status,
+      type,
+    };
+
+    console.log("[callbackAccountStatus] 👉 准备发起回调请求:", {
+      url,
+      method,
+      payload,
+      headers: {
+        "tenant-id": "1",
+        Authorization: `Bearer ${token ? token.slice(0, 10) + "...(hidden)" : "null"}`,
+        "Content-Type": "application/json",
+      },
+    });
+
     const res = await axios.put(
       url,
       {
@@ -38,12 +58,31 @@ async function callbackBackend(applicationNo, approver, status) {
 
 async function callbackAccountStatus(applicationNo, approver, status, type) {
   const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
+  const method = "PUT";
+
+  const payload = {
+    applicationNo,
+    approver,
+    status,
+    type,
+  };
   try {
     if (![1, 2, 3, 5].includes(type)) {
       console.error("type 必须是 1、2、3、5");
       return false;
     }
     const token = await getErsanToken(redis);
+
+    console.log("[callbackAccountStatus] 👉 准备发起回调请求:", {
+      url,
+      method,
+      payload,
+      headers: {
+        "tenant-id": "1",
+        Authorization: `Bearer ${token ? token.slice(0, 10) + "...(hidden)" : "null"}`,
+        "Content-Type": "application/json",
+      },
+    });
     const res = await axios.put(
       url,
       {
@@ -75,8 +114,25 @@ async function callbackAccountStatus(applicationNo, approver, status, type) {
 
 async function callbackAppStatus(applicationNo, confirmer, confirmStatus) {
   const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/mchCheck`;
+  const method = "PUT";
+
+  const payload = {
+    applicationNo,
+    confirmer,
+    confirmStatus
+  };
   try {
     const token = await getErsanToken(redis);
+    console.log("[callbackAccountStatus] 👉 准备发起回调请求:", {
+      url,
+      method,
+      payload,
+      headers: {
+        "tenant-id": "1",
+        Authorization: `Bearer ${token ? token.slice(0, 10) + "...(hidden)" : "null"}`,
+        "Content-Type": "application/json",
+      },
+    });
     const res = await axios.put(
       url,
       {
