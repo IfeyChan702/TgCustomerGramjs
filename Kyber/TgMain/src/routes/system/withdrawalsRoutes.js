@@ -262,7 +262,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         return res.json(fail(`缺少必填参数: ${missing.join(", ")}`));
       }
 
-      const chatInfo = await merChatService.getChatInfoByMerchant(merchantNo);
+      const chatInfo = await merChatService.getChatInfoByMerchant("M20251111111111112233");
       if (!chatInfo?.chatId) {
         return res.json(fail("商户未配置 TG 群聊"));
       }
