@@ -81,7 +81,6 @@ module.exports = function createWithdrawalsRouter(bot) {
         amount,
         currency,
         balanceAvailable,
-        exchangeRate,
         applyTime: formattedApplyTime,
         optType
       };
