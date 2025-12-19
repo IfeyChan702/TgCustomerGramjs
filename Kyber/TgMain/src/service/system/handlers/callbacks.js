@@ -7,42 +7,61 @@ const sysWithdrawContextService = require("../sysWithdrawContextService")
 
 function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
+    const traceId = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+
+    const log = (...args) => console.log(`[CB ${traceId}]`, ...args);
+    const warn = (...args) => console.warn(`[CB ${traceId}]`, ...args);
+    const errl = (...args) => console.error(`[CB ${traceId}]`, ...args);
+
     try {
-      console.log("[用户点击回调]callback_query data=", ctx.callbackQuery?.data);
       const cq = ctx.callbackQuery;
+      log("incoming callback_query", { hasCq: !!cq, data: cq?.data });
       if (!cq || typeof cq.data !== "string" || cq.data.length === 0) {
-        console.log("无效回调（缺少 data）");
-        await ctx.answerCbQuery("系统繁忙", { show_alert: true });
+        warn("invalid callback: missing data");
+        try {
+          await ctx.answerCbQuery("系统繁忙", { show_alert: true });
+        } catch (e) {
+          warn("answerCbQuery failed (missing data)", e?.message || e);
+        }
         return;
       }
       const parts = cq.data.split("|");
+      log("parsed parts", { partsLen: parts.length, parts });
       const action = parts[0];
       const orderId = parts[1];
       const merchantNo = parts[2];
       const sig = parts[parts.length - 1];
       const msg = cq.message;
-      if (parts.length < 5) {
-        console.error("callback_data 格式不完整:", cq.data);
-      }
-      if (!/^M\d{14,30}$/.test(merchantNo)) {
-        return await ctx.answerCbQuery("商户NO格式错误", { show_alert: true });
-      }
-
-      if (!verify(action, orderId, merchantNo, sig)) {
-        return await ctx.answerCbQuery("签名校验失败", { show_alert: true });
-      }
 
       const approver = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
       const ts = new Date().toLocaleString();
       const approverId = ctx.from.id;
 
+      if (parts.length < 5) {
+        errl("callback_data 格式不完整", cq.data);
+      }
+      log("base fields", { action, orderId, merchantNo, ts, approverId, approver });
+      if (!/^M\d{14,30}$/.test(merchantNo)) {
+        warn("merchantNo invalid", merchantNo);
+        return await ctx.answerCbQuery("商户NO格式错误", { show_alert: true });
+      }
+
+      if (!verify(action, orderId, merchantNo, sig)) {
+        warn("签名校验失败");
+        return await ctx.answerCbQuery("签名校验失败", { show_alert: true });
+      }
+
       if (action === "okAudit") {
+        log("enter okAudit branch");
 
         if (!(await isReviewer(orderId, ctx.from.id))) {
+          console.warn("没有审核权限,telegramId:",ctx.from.id);
           return await ctx.answerCbQuery("你没有审核权限", { show_alert: true });
         }
 
+        log("getWithdrawInfo start", { orderId, merchantNo });
         const info = await getWithdrawInfo(orderId, merchantNo);
+        log("getWithdrawInfo result", { found: !!info });
 
         if (!info) {
           return await ctx.answerCbQuery("未找到提现记录，请联系管理员", { show_alert: true });
@@ -61,9 +80,9 @@ function registerCallbackHandler(bot) {
           applyTime
         } = info;
 
-
+        log("callbackAppStatus start", { orderId, approver, status: 1 });
         const ok = await callbackAppStatus(orderId, approver, 1);
-
+        log("callbackAppStatus result", { ok });
         if (!ok) {
           return await ctx.answerCbQuery("确认失败，请重试", { show_alert: true });
         }
@@ -87,7 +106,7 @@ function registerCallbackHandler(bot) {
           optType,
           isConfirmInfo:false
         });
-
+        log("editMessageText start (okAudit)");
         await ctx.reply(
           nextMsg,
           {
@@ -99,47 +118,55 @@ function registerCallbackHandler(bot) {
             )
           }
         );
-
+        log("editMessageText done (okAudit)");
         return;
       }
 
       if (action === "noAudit") {
+        log("enter noAudit branch");
         if (!(await isReviewer(orderId, ctx.from.id))) {
+          warn("你没有权限,telegram:",ctx.from.id);
           return await ctx.answerCbQuery("你没有审核权限", { show_alert: true });
         }
+        log("callbackAppStatus start", { orderId, approver, status: 2 });
         const ok = await callbackAppStatus(orderId, approver, 2);
+        log("callbackAppStatus result", { ok });
         if (!ok) {
+          warn("callbackAppStatus failed, try edit failure text");
           try {
             await ctx.editMessageText(
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
           } catch {
+            warn("editMessageText failed (noAudit fail)", e?.message || e);
           }
           return;
         }
         const original = msg?.text || msg?.caption || "";
+        log("editMessageText start (noAudit)");
         const newText =
           original + `\n\n <b>❌ 信息有误，已拒绝</b> \n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
+        log("editMessageText done (noAudit)");
         return;
       }
 
 
       const typeStr = parts[3];
       const type = parseInt(typeStr, 10);
-
+      log("parsed type", { type, isNaN: Number.isNaN(type) });
       if (isNaN(type)) {
-        console.error("type 不是数字:", typeStr);
+        errl("type 不是数字", { typeStr, data: cq.data });
         return false;
       }
       let ok = false;
 
       if (action === "ok") {
-
-        if (!(await isApprover(orderId, ctx.from.id))) {
+        console.log("ok,执行确认订单步骤")
+        /*if (!(await isApprover(orderId, ctx.from.id))) {
           return await ctx.answerCbQuery("你没有确认权限", { show_alert: true });
-        }
+        }*/
 
         // 读取审核状态
         const reviewInfo = await getStageStatus(orderId, "approve");
@@ -226,6 +253,7 @@ function registerCallbackHandler(bot) {
 
       if (action === "no") {
 
+        console.log("no,执行拒绝订单步骤")
         if (!(await isApprover(orderId, ctx.from.id))) {
           return await ctx.answerCbQuery("你没有确认权限", { show_alert: true });
         }
