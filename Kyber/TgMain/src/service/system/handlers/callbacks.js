@@ -8,12 +8,22 @@ const sysWithdrawContextService = require("../sysWithdrawContextService")
 function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
     try {
-      console.log("[用户点击回调]callback_query");
-      const parts = ctx.callbackQuery.data.split("|");
+      console.log("[用户点击回调]callback_query data=", ctx.callbackQuery?.data);
+      const cq = ctx.callbackQuery;
+      if (!cq || typeof cq.data !== "string" || cq.data.length === 0) {
+        console.log("无效回调（缺少 data）");
+        await ctx.answerCbQuery("系统繁忙", { show_alert: true });
+        return;
+      }
+      const parts = cq.data.split("|");
       const action = parts[0];
       const orderId = parts[1];
       const merchantNo = parts[2];
       const sig = parts[parts.length - 1];
+      const msg = cq.message;
+      if (parts.length < 5) {
+        console.error("callback_data 格式不完整:", cq.data);
+      }
       if (!/^M\d{14,30}$/.test(merchantNo)) {
         return await ctx.answerCbQuery("商户NO格式错误", { show_alert: true });
       }
@@ -25,8 +35,6 @@ function registerCallbackHandler(bot) {
       const approver = ctx.from.username || ctx.from.first_name || String(ctx.from.id);
       const ts = new Date().toLocaleString();
       const approverId = ctx.from.id;
-
-      await ctx.answerCbQuery("处理中…");
 
       if (action === "okAudit") {
 
@@ -99,7 +107,6 @@ function registerCallbackHandler(bot) {
         if (!(await isReviewer(orderId, ctx.from.id))) {
           return await ctx.answerCbQuery("你没有审核权限", { show_alert: true });
         }
-        //TODO
         const ok = await callbackAppStatus(orderId, approver, 2);
         if (!ok) {
           try {
@@ -111,7 +118,7 @@ function registerCallbackHandler(bot) {
           }
           return;
         }
-        const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
+        const original = msg?.text || msg?.caption || "";
         const newText =
           original + `\n\n <b>❌ 信息有误，已拒绝</b> \n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
@@ -153,7 +160,9 @@ function registerCallbackHandler(bot) {
         }
 
         // 添加本次审核人
-        approved.push(approverId);
+        if (!approved.includes(approverId)) {
+          approved.push(approverId);
+        }
         reviewInfo.approvedBy = approved;
         await saveStageStatus(orderId, "approve",reviewInfo);
 
@@ -169,7 +178,7 @@ function registerCallbackHandler(bot) {
         try {
           await ctx.editMessageText(newTextWithProgress, {
             parse_mode: "HTML",
-            reply_markup: ctx.callbackQuery.message.reply_markup
+            reply_markup: msg.reply_markup
           });
         } catch (err) {
           console.warn("更新进度信息失败：", err.message);
