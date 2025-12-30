@@ -3,8 +3,8 @@ const { getErsanToken } = require("../../service/handle/handleOrder");
 const { redis } = require("../../models/redisModel");
 
 async function callbackBackend(applicationNo, approver, status) {
-  //const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
-  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
+  const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
+  //const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
   const method = "PUT";
   const type = 4;
 
@@ -70,8 +70,8 @@ async function callbackBackend(applicationNo, approver, status) {
 }
 
 async function callbackAccountStatus(applicationNo, approver, status, type) {
-  //线上const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
-  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
+  const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
+  //const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
   const method = "PUT";
 
   const payload = { applicationNo, approver, status, type };
@@ -146,8 +146,8 @@ async function callbackAccountStatus(applicationNo, approver, status, type) {
 }
 
 async function callbackAppStatus(applicationNo, confirmer, confirmStatus) {
-  //const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/mchCheck`;
-  const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/mchCheck`;
+  const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/mchCheck`;
+  //const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/mchCheck`;
   const method = "PUT";
 
   const payload = { applicationNo, confirmer, confirmStatus };
