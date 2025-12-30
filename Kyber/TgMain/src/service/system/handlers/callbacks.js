@@ -1,9 +1,10 @@
 // handlers/callbacks.js
 const { verify } = require("../security");
 const { callbackBackend, callbackAppStatus,callbackAccountStatus } = require("../backend");
-const { tryDecide, isDecided, isReviewer, getStageStatus, saveStageStatus, isApprover } = require("../reviewStore");
+const { tryDecide, isDecided, isReviewer, getStageStatus, saveStageStatus, isApprover,ensureOrderKeys } = require("../reviewStore");
 const { approvedSuffix, approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../ui");
 const sysWithdrawContextService = require("../sysWithdrawContextService")
+const merChatService = require("../sysMerchantChatService");
 
 function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
@@ -37,18 +38,37 @@ function registerCallbackHandler(bot) {
       const ts = new Date().toLocaleString();
       const approverId = ctx.from.id;
 
-      if (parts.length < 5) {
+      if (parts.length < 4) {
         errl("callback_data 格式不完整", cq.data);
       }
       log("base fields", { action, orderId, merchantNo, ts, approverId, approver });
       if (!/^M\d{14,30}$/.test(merchantNo)) {
         warn("merchantNo invalid", merchantNo);
-        return await ctx.answerCbQuery("商户NO格式错误", { show_alert: true });
+        return;
       }
 
       if (!verify(action, orderId, merchantNo, sig)) {
         warn("签名校验失败");
-        return await ctx.answerCbQuery("签名校验失败", { show_alert: true });
+        return;
+      }
+
+      try {
+        const chatInfo = await merChatService.getChatInfoByMerchant(merchantNo);
+        if (chatInfo?.chatId) {
+          if (!chatInfo.reviewerIds.length && !chatInfo.approveIds.length) {
+            warn("merchant chat has no reviewers or approvers", { merchantNo });
+          }
+          await ensureOrderKeys(orderId, {
+            reviewerIds: chatInfo.reviewerIds || [],
+            approverIds: chatInfo.approveIds || [],
+            needAudit: 1,
+            needApprove: 1
+          });
+        } else {
+          warn("merchant chat config missing", { merchantNo });
+        }
+      } catch (e) {
+        warn("ensureOrderKeys failed", e?.message || e);
       }
 
       if (action === "okAudit") {
@@ -138,8 +158,8 @@ function registerCallbackHandler(bot) {
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
-          } catch {
-            warn("editMessageText failed (noAudit fail)", e?.message || e);
+          } catch(err) {
+            warn("editMessageText failed (progress)", err?.message || err);
           }
           return;
         }
@@ -178,10 +198,12 @@ function registerCallbackHandler(bot) {
           approvedByLen: (reviewInfo?.approvedBy || []).length
         });
         if (!reviewInfo) {
-          return await ctx.answerCbQuery("订单状态异常，请联系管理员", { show_alert: true });
+          warn("订单状态异常，请联系管理员");
+          return;
         }
 
         if (reviewInfo.decided) {
+          warn("该订单已处理", { show_alert: true })
           return await ctx.answerCbQuery("该订单已处理", { show_alert: true });
         }
 
@@ -189,12 +211,6 @@ function registerCallbackHandler(bot) {
         const approved = reviewInfo.approvedBy || [];
 
         // 已经点过
-        if (approved.includes(approverId)) {
-          log("already approved by this user", { approverId });
-          return await ctx.answerCbQuery("你已确认过，无需重复操作");
-        }
-
-        // 添加本次审核人
         if (approved.includes(approverId)) {
           log("already approved by this user", { approverId });
           return await ctx.answerCbQuery("你已确认过，无需重复操作");
@@ -223,7 +239,7 @@ function registerCallbackHandler(bot) {
             reply_markup: msg.reply_markup
           });
         } catch (err) {
-          warn("editMessageText failed (progress)", e?.message || e);
+          warn("editMessageText failed (progress)", err?.message || err);
         }
 
         if (currentCount < needCount) {
@@ -236,6 +252,7 @@ function registerCallbackHandler(bot) {
 
         // 达到确认人数，进入最终通过流程
         reviewInfo.decided = true;
+        await saveStageStatus(orderId, "approve", reviewInfo);
         log("saveStageStatus start (complete)");
         await saveStageStatus(orderId,"complete", reviewInfo);
         log("saveStageStatus done (complete)");
@@ -263,8 +280,8 @@ function registerCallbackHandler(bot) {
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 订单处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
-          } catch {
-            warn("editMessageText failed (final fail)", e?.message || e);
+          } catch (err){
+            warn("editMessageText failed (final fail)", err?.message || err);
           }
           return;
         }
@@ -309,13 +326,12 @@ function registerCallbackHandler(bot) {
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
-          } catch {
-            warn("editMessageText failed (reject fail)", e?.message || e);
+          } catch(err) {
+            warn("editMessageText failed (reject fail)", err?.message || err);
           }
           return;
         }
         const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
-        errl("处理失败订单=======");
         const newText =
           original + `\n\n <b>❌ 订单被拒绝</b> \n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });

@@ -220,6 +220,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         const applyTimeStr = formatDate(applyTime || Date.now());
 
         if (approveIds?.length) {
+          console.log('/order/create,setApprovers{}',approveIds)
           await setApprovers(orderId, approveIds, 1);
         }
 
