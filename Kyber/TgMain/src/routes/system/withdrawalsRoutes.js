@@ -9,7 +9,6 @@ const {
 } = require("../../service/system/ui");
 const { success, fail } = require("../../utils/responseWrapper");
 const merChatService = require("../../service/system/sysMerchantChatService");
-const router = express.Router();
 const { redis } = require("../../models/redisModel");
 const withdrawContextService = require("../../service/system/sysWithdrawContextService");
 /**
@@ -44,6 +43,35 @@ const formatDate = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
+
+const CHAT_ID = -1003256208710;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let lastSendAt = 0;
+
+async function safeSend(bot, chatId, text, extra = {}, minIntervalMs = 300) {
+  // 简单节流：同一进程内两次发送至少间隔 minIntervalMs
+  const now = Date.now();
+  const gap = now - lastSendAt;
+  if (gap < minIntervalMs) await sleep(minIntervalMs - gap);
+
+  try {
+    const ret = await bot.telegram.sendMessage(chatId, text, extra);
+    lastSendAt = Date.now();
+    return ret;
+  } catch (err) {
+    const code = err?.response?.error_code;
+    const retryAfter = err?.response?.parameters?.retry_after;
+
+    if (code === 429 && retryAfter) {
+      await sleep((retryAfter + 1) * 1000);
+      const ret = await bot.telegram.sendMessage(chatId, text, extra);
+      lastSendAt = Date.now();
+      return ret;
+    }
+    throw err;
+  }
+}
 
 
 module.exports = function createWithdrawalsRouter(bot) {
@@ -300,17 +328,22 @@ module.exports = function createWithdrawalsRouter(bot) {
 
 
   router.post("/message/alarm", async (req, res) => {
+    const { alarmMessage } = req.body || {};
 
-    const {
-      alarmMessage
-    } = req.body || {};
+    // 1) 防止空消息导致 sendMessage 报错
+    if (!alarmMessage || String(alarmMessage).trim() === "") {
+      return res.json(fail("alarmMessage 不能为空"));
+    }
+
     try {
-      await bot.telegram.sendMessage(-1003256208710, alarmMessage, {
-        parse_mode: "HTML",
-      })
+      await safeSend(bot, CHAT_ID, alarmMessage, { parse_mode: "HTML" });
       return res.json(success("传送成功"));
-      }catch (err) {
-      console.error("[/message/alarm] error:", err);
+    } catch (err) {
+      // 2) 如果还是 429，把 retry_after 打出来方便你确认
+      const retryAfter = err?.response?.parameters?.retry_after;
+      const code = err?.response?.error_code;
+      console.error("[/message/alarm] error:", { code, retryAfter }, err);
+
       return res.json(fail("系统异常"));
     }
   });
