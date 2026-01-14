@@ -108,7 +108,8 @@ function registerCallbackHandler(bot) {
         }
 
         const oldText = ctx.callbackQuery.message.text || "";
-        const newText = `${oldText}\n\n✅ 确认信息无误\n时间：${ts}`;
+        const who = ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(approverId));
+        const newText = `${oldText}\n\n✅ 确认信息无误\n确认人：${who}\n时间：${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
 
         const nextMsg = formatWithdrawCard({
@@ -165,8 +166,8 @@ function registerCallbackHandler(bot) {
         }
         const original = msg?.text || msg?.caption || "";
         log("editMessageText start (noAudit)");
-        const newText =
-          original + `\n\n <b>❌ 信息有误，已拒绝</b> \n时间: ${ts}`;
+        const who = ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(approverId));
+        const newText = original + `\n\n <b>❌ 信息有误，已拒绝</b>\n<b>操作人：</b>${who}\n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
         log("editMessageText done (noAudit)");
         return;
@@ -227,9 +228,15 @@ function registerCallbackHandler(bot) {
 
         //更新 Telegram 消息里的审核进度
         const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
-        const progressLine = `已确认：${currentCount}/${needCount}`;
-        const baseText = original.replace(/已确认：\d+\/\d+/g, ""); // 清理旧的进度行
-        const newTextWithProgress = baseText + `\n${progressLine}`;
+        const who = ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(approverId));
+
+        const baseText = original
+          .replace(/已确认：\d+\/\d+(\n最后确认：.*)?/g, "")
+          .replace(/✅[\s\S]*?时间：.*$/g, "")
+          .trim();
+
+        const progressLine = `已确认：${currentCount}/${needCount}\n最后确认：${who}（${ts}）`;
+        const newTextWithProgress = `${baseText}\n\n${progressLine}`;
 
         //如果还没达到人数要求，提示等待其他老板
         log("editMessageText start (progress)", { currentCount, needCount });
@@ -287,7 +294,12 @@ function registerCallbackHandler(bot) {
         }
 
         // 拼接通过后文本
-        const finalText = newTextWithProgress + approvedSuffix(ts);
+        const finalText =
+          `${baseText}\n\n` +
+          `已确认：${currentCount}/${needCount}\n\n` +
+          `✅ 订单已确认,请稍等!\n` +
+          `确认人：${who}\n` +
+          `时间：${ts}`;
         log("editMessageText start (final)");
         await ctx.editMessageText(finalText, { parse_mode: "HTML" });
         log("editMessageText done (final)");
@@ -332,8 +344,8 @@ function registerCallbackHandler(bot) {
           return;
         }
         const original = ctx.callbackQuery.message.text || ctx.callbackQuery.message.caption || "";
-        const newText =
-          original + `\n\n <b>❌ 订单被拒绝</b> \n时间: ${ts}`;
+        const who = ctx.from.username ? `@${ctx.from.username}` : (ctx.from.first_name || String(approverId));
+        const newText = original + `\n\n <b>❌ 订单被拒绝</b>\n<b>操作人：</b>${who}\n时间: ${ts}`;
         await ctx.editMessageText(newText, { parse_mode: "HTML" });
         return;
       }
