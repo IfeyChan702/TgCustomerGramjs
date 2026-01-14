@@ -141,7 +141,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
         console.warn("[merCommand requestErsanUrl] 所有商户都未查到数据");
         return;
       }
-      return results.join("\n────────────────────\n");
+      return results.join("\n─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n");
     }
 
     // ===== 根据商户查询成功率 =====
@@ -182,12 +182,13 @@ async function requestErsanUrl(command, userArgs, chatId) {
 
       const formatted = await formatResult(command, data);
 
-      const blocks = String(formatted)
-        .split(/\n(?=🏷️)/g)   // 每个块都以 🏷️ 开头
+      const text = String(formatted).trim();
+      const blocks = text
+        .split(/\n(?=<b>[^<]+<\/b>\n)/g)
         .map(s => s.trim())
         .filter(Boolean);
 
-      const sep = "\n────────────────────\n";
+      const sep = "\n─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n";
       return blocks.join(sep);
     }
 
