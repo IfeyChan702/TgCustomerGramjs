@@ -127,14 +127,18 @@ async function requestErsanUrl(command, userArgs, chatId) {
     // ===== balance 命令：对所有商户调用并拼接 =====
     if (isBalanceCommand) {
       const results = [];
+      const escapeHtml = (s = "") =>
+        String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       for (const { merchantNo, merchantName } of merchants) {
+        const name = escapeHtml(merchantName);
         const { result, orderNotFound } = await doRequest(merchantNo);
         if (result) {
-          results.push(`商户 ${merchantName}：\n${result}`);
+          results.push(`<b>${name}</b>\n${result}`);
         } else if (orderNotFound) {
-          results.push(`商户 ${merchantName}：订单不存在`);
+          results.push(`<b>${name}</b>\n订单不存在`);
         } else {
-          console.warn(`商户 ${merchantName}(${merchantNo}) 未查到数据`);
+          results.push(`<b>${name}</b>\n暂无数据`);
+          console.warn(`[balance] 商户 ${merchantName}(${merchantNo}) 未查到数据`);
         }
       }
       if (!results.length) {

@@ -23,7 +23,6 @@ function registerGroupHandler(bot) {
     // 1) /getchatid
     if (/^\/getchatId1(?:@\w+)?$/i.test(token)) {
       if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
-        // 如果不是群，直接忽略（或自行决定要不要在私聊返回）
         return;
       }
 
@@ -74,8 +73,13 @@ function registerGroupHandler(bot) {
     }
 
     const parts = text.trim().split(/\s+/);
-    const identifier = parts[0].replace("/", "");
-    const userArgs = parts.slice(1);
+
+    const rawCmdToken = token || parts[0] || "";
+    const identifier = rawCmdToken.replace(/^\//, "").split("@")[0].toLowerCase();
+
+    const restText = text.slice(cmdEnt.offset + cmdEnt.length).trim();
+    const userArgs = restText ? restText.split(/\s+/) : [];
+    //todo 这里生产的时候需要注意，更改，api.pay.ersan.click测试，api.gamecloud.vip生产
     const command = await tgCommandListService.getByIdentifierUrl(identifier, "api.gamecloud.vip");
     if (command) {
 
