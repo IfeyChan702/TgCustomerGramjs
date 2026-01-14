@@ -141,7 +141,54 @@ async function requestErsanUrl(command, userArgs, chatId) {
         console.warn("[merCommand requestErsanUrl] 所有商户都未查到数据");
         return;
       }
-      return results.join("\n\n=============================\n\n");
+      return results.join("\n────────────────────\n");
+    }
+
+    // ===== 根据商户查询成功率 =====
+
+    const isMchOrderStat =
+      /payinRate/i.test(command.identifier) ||
+      /\/plt\/order-statistics\/payinRate/i.test(command.url);
+
+    if (isMchOrderStat) {
+      const merchantNos = merchants.map(m => m.merchantNo).filter(Boolean);
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "tenant-id": "1"
+      };
+      const axiosCfg = { headers, timeout: 15000 };
+
+      let response;
+      try {
+        response = await axios.post(command.url, { merchantNos }, axiosCfg);
+      } catch (e) {
+        console.warn(`[merCommand requestErsanUrl] mchOrderStat 请求异常: ${e?.message || e}`);
+        return;
+      }
+
+      const code = response?.data?.code;
+      const msg = response?.data?.msg?.trim?.() || "";
+      const rawData = response?.data?.data ?? null;
+
+      if (typeof code !== "undefined" && code !== 0) {
+        console.warn(`[merCommand requestErsanUrl] mchOrderStat 接口失败 code=${code}, msg=${msg}`);
+        return;
+      }
+
+      if (!rawData) return "暂无统计数据";
+
+      const data = normalizeMchOrderStatData(rawData);
+
+      const formatted = await formatResult(command, data);
+
+      const blocks = String(formatted)
+        .split(/\n(?=🏷️)/g)   // 每个块都以 🏷️ 开头
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const sep = "\n────────────────────\n";
+      return blocks.join(sep);
     }
 
     // ===== 非 balance 命令逻辑 =====
@@ -200,6 +247,46 @@ async function formatResult(command, data) {
   }
 
   return result;
+}
+
+function toPercent(val, digits = 2) {
+  if (val === null || val === undefined || val === "") return "";
+  const n = Number(val);
+  if (!Number.isFinite(n)) return String(val);
+  return (n * 100).toFixed(digits);
+}
+
+function normalizeMchOrderStatData(data) {
+  const mapOne = (item) => ({
+    ...item,
+
+    // 5 分钟
+    fiveMinuteSuccessCount: item.fiveMinutePayInStat?.successCount ?? 0,
+    fiveMinuteTotalCount: item.fiveMinutePayInStat?.totalCount ?? 0,
+    fiveMinuteSuccessRate: ((item.fiveMinutePayInStat?.successRate ?? 0) * 100).toFixed(1),
+
+    // 15 分钟
+    fifteenMinuteSuccessCount: item.fifteenMinutePayInStat?.successCount ?? 0,
+    fifteenMinuteTotalCount: item.fifteenMinutePayInStat?.totalCount ?? 0,
+    fifteenMinuteSuccessRate: ((item.fifteenMinutePayInStat?.successRate ?? 0) * 100).toFixed(1),
+
+    // 30 分钟
+    thirtyMinuteSuccessCount: item.thirtyMinutePayInStat?.successCount ?? 0,
+    thirtyMinuteTotalCount: item.thirtyMinutePayInStat?.totalCount ?? 0,
+    thirtyMinuteSuccessRate: ((item.thirtyMinutePayInStat?.successRate ?? 0) * 100).toFixed(1),
+
+    // 60 分钟
+    sixtyMinuteSuccessCount: item.sixtyMinutePayInStat?.successCount ?? 0,
+    sixtyMinuteTotalCount: item.sixtyMinutePayInStat?.totalCount ?? 0,
+    sixtyMinuteSuccessRate: ((item.sixtyMinutePayInStat?.successRate ?? 0) * 100).toFixed(1),
+
+    // 全天
+    allDaySuccessCount: item.allDayPayInStat?.successCount ?? 0,
+    allDayTotalCount: item.allDayPayInStat?.totalCount ?? 0,
+    allDaySuccessRate: ((item.allDayPayInStat?.successRate ?? 0) * 100).toFixed(1),
+  });
+
+  return Array.isArray(data) ? data.map(mapOne) : mapOne(data);
 }
 
 module.exports = {
