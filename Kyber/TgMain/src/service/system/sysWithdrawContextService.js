@@ -49,7 +49,7 @@ exports.insert = async (data) => {
     data.usdtFinal,
     data.applyTime,
     data.optType,
-    data.isSameAddress ? 1 : 0
+    data.finalIsSameAddress ? 1 : 0
   ];
 
   try {
