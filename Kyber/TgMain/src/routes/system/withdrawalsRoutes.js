@@ -82,21 +82,24 @@ module.exports = function createWithdrawalsRouter(bot) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
+  /**
+   * 提现接口
+   */
   router.post("/withdrawals/create", async (req, res) => {
     const {
-      merchantNo,
-      merchantName,
-      orderId,
-      amount,
-      currency,
-      balanceAvailable,
-      usdtAddress,
-      addressHint,
-      exchangeRate,
-      usdtFinal,
-      applyTime,
+      merchantNo,//商户号
+      merchantName,//商户名
+      orderId,//订单id
+      amount,//金额
+      currency,//货币
+      balanceAvailable,//可用余额
+      usdtAddress,//回u地址
+      addressHint,//地址提示
+      exchangeRate,//汇率
+      usdtFinal,//最终u价
+      applyTime,//申请时间
       optType,//0-法币提现,1-提U
-      isSameAddress = true
+      isSameAddress = true//是否是相同的地址
     } = req.body || {};
     try {
 
@@ -120,6 +123,9 @@ module.exports = function createWithdrawalsRouter(bot) {
       if (missing.length > 0) {
         return res.json(fail(`缺少必要参数: ${missing.join(", ")}`));
       }
+
+      const hintText = (addressHint ?? "").toString();
+      const finalIsSameAddress = hintText.includes("首次提现") ? true : Boolean(isSameAddress);
 
       const chatReviewer = await merChatService.getChatInfoByMerchant(merchantNo);
       if (!chatReviewer || !chatReviewer.chatId) {
@@ -145,7 +151,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         usdtFinal,
         applyTime: formattedApplyTime,
         optType,
-        isSameAddress
+        finalIsSameAddress
       };
 
       const exist = await withdrawContextService.findByOrderIdAndMerchantNo(orderId, merchantNo);
@@ -171,7 +177,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         addressHint: esc(addressHint || ""),
         exchangeRate: esc(exchangeRate),
         usdtFinal: esc(usdtFinal),
-        isSameAddress,
+        finalIsSameAddress,
         optType: esc(optType),
         isConfirmInfo:true
       });
@@ -192,7 +198,7 @@ module.exports = function createWithdrawalsRouter(bot) {
             String(addressHint || ""),
             String(exchangeRate),
             String(usdtFinal),
-            isSameAddress,
+            finalIsSameAddress,
             String(optType)
           )
         }
@@ -205,6 +211,9 @@ module.exports = function createWithdrawalsRouter(bot) {
     }
   });
 
+  /**
+   * 内部请款接口
+   */
   router.post("/order/create", async (req, res) => {
     try {
       // 1) 解构 & 规范化
@@ -327,6 +336,9 @@ module.exports = function createWithdrawalsRouter(bot) {
   });
 
 
+  /**
+   * 报警接口
+   */
   router.post("/message/alarm", async (req, res) => {
     const { alarmMessage } = req.body || {};
 
