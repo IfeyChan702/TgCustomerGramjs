@@ -84,7 +84,7 @@ function registerCallbackHandler(bot) {
         log("getWithdrawInfo result", { found: !!info });
 
         if (!info) {
-          return await ctx.answerCbQuery("未找到提现记录，请联系管理员", { show_alert: true });
+          return await ctx.answerCbQuery("未找到提现记录，请联系相关人员", { show_alert: true });
         }
         const {
           merchantName,
