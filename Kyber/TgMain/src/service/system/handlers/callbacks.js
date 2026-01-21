@@ -5,6 +5,7 @@ const { tryDecide, isDecided, isReviewer, getStageStatus, saveStageStatus, isApp
 const { approvedSuffix, approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../ui");
 const sysWithdrawContextService = require("../sysWithdrawContextService")
 const merChatService = require("../sysMerchantChatService");
+const { onMerchantCallback } = require("./merchantWizardHandler");
 
 function registerCallbackHandler(bot) {
   bot.on("callback_query", async (ctx) => {
@@ -24,6 +25,10 @@ function registerCallbackHandler(bot) {
         } catch (e) {
           warn("answerCbQuery failed (missing data)", e?.message || e);
         }
+        return;
+      }
+      if (cq.data.startsWith("merchant:") || cq.data.startsWith("toggle:") || cq.data.startsWith("approve:")) {
+        await onMerchantCallback(ctx);
         return;
       }
       const parts = cq.data.split("|");

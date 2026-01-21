@@ -157,11 +157,54 @@ function rejectedFinal(username, ts) {
   );
 }
 
+async function sendApproveKeyboard(ctx, state) {
+  const kb = state.admins.map(a => ([{
+    text: `${a.selected ? "✅" : "☐"} ${a.name}`,
+    callback_data: `toggle:${a.id}`
+  }]));
+
+  kb.push([{ text: "确认创建", callback_data: "approve:confirm" }]);
+  await ctx.reply("请选择审批人：", { reply_markup: { inline_keyboard: kb } });
+}
+
+async function editApproveKeyboard(ctx, state) {
+  const kb = state.admins.map(a => ([{
+    text: `${a.selected ? "✅" : "☐"} ${a.name}`,
+    callback_data: `toggle:${a.id}`
+  }]));
+
+  kb.push([{ text: "确认创建", callback_data: "approve:confirm" }]);
+  await ctx.editMessageReplyMarkup({ inline_keyboard: kb });
+}
+
+
+async function sendApproveSummary(ctx, state) {
+  const list = state.approveCandidates.length
+    ? state.approveCandidates.map(id => `- ${id}`).join("\n")
+    : "（暂无）";
+
+  await ctx.reply(
+    `当前审批人 ${state.approveCandidates.length} / ${state.expectedApproveCount}\n` +
+    list,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "使用当前审批人", callback_data: "approve:use_current" }],
+          [{ text: "继续等待", callback_data: "approve:wait_more" }]
+        ]
+      }
+    }
+  );
+}
+
 module.exports = {
   approveKeyboard,
   approvedSuffix,
   waitingReasonSuffix,
+  editApproveKeyboard,
+  sendApproveKeyboard,
   rejectedFinal,
+  sendApproveSummary,
   formatWithdrawCard,
   auditKeyboard,
   formatOrderCard,

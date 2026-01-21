@@ -52,3 +52,44 @@ exports.getMerchantNoByChatId = async (chatId) => {
       merchantName: r.merchantName
     }));
 };
+
+exports.createMerchantChat = async (data) => {
+  const sql = `
+    INSERT INTO sys_merchant_chat
+    (merchant_no, merchant_name, chat_id, approve_ids, role)
+    VALUES (?, ?, ?, ?, 'audit')
+  `;
+  return db.query(sql, [
+    data.merchantNo,
+    data.merchantName,
+    data.chatId,
+    JSON.stringify(data.approveIds)
+  ]);
+};
+
+/**
+ * 更新商户聊天的审批人列表
+ * @param {string|number} merchantNo 商户编号
+ * @param {number[]} approveIds 审批人ID数组
+ */
+exports.updateApproveIds = (merchantNo, approveIds) => {
+  const sql = `
+    UPDATE sys_merchant_chat
+    SET approve_ids = ?
+    WHERE merchant_no = ?
+  `;
+  return db.query(sql, [JSON.stringify(approveIds), merchantNo]);
+};
+
+/**
+ * 删除商户聊天绑定记录
+ * @param {string|number} merchantNo 商户编号
+ */
+exports.deleteMerchantChat = (merchantNo) => {
+  const sql = `
+    DELETE FROM sys_merchant_chat
+    WHERE merchant_no = ?
+  `;
+  return db.query(sql, [merchantNo]);
+};
+
