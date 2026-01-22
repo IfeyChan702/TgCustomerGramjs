@@ -1,5 +1,5 @@
 const tgDbService = require("../../../../service/tgDbService");
-const tgComFormatService = require("../../../command/tgComFormatService")
+const tgComFormatService = require("../../../command/tgComFormatService");
 const axios = require("axios");
 const { getErsanToken } = require("../../../../service/handle/handleOrder");
 const sysMerchantChatService = require("../../../../service/system/sysMerchantChatService");
@@ -7,6 +7,29 @@ const { redis } = require("../../../../models/redisModel");
 
 
 const AUTO_FILLED_PARAMS = new Set(["merchantNo"]);
+
+const batchFormatters = {
+
+  withdrawstat: (data, command, userArgs, params = []) => {
+
+    let timeSpanArg =
+      userArgs.find(a => a.startsWith("timeSpan="))?.split("=")[1] ||
+      userArgs.find(a => a.startsWith("minutes="))?.split("=")[1];
+
+    if (!timeSpanArg) {
+      const idx = params.findIndex(p => p.parameter_name === "timeSpan");
+      if (idx >= 0 && userArgs[idx] && !userArgs[idx].includes("=")) {
+        timeSpanArg = userArgs[idx];
+      }
+    }
+
+    const timeSpan = Number(timeSpanArg ?? command?.default_timeSpan ?? 10);
+
+    data.timeSpan = Number.isFinite(timeSpan) ? timeSpan : 10;
+
+    return data;
+  }
+};
 
 async function requestErsanUrl(command, userArgs, chatId) {
   try {
@@ -26,6 +49,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const isBalanceCommand = /balance/i.test(command.identifier);
 
     const params = await tgDbService.getParamsByCommandId(command.id) || [];
+    const isBatch = command.execute_mode === "batch";
     const requiredParams = params.filter(p => p.required === 1);
     const effectiveRequiredCount = requiredParams.filter(p => !AUTO_FILLED_PARAMS.has(p.parameter_name)).length;
     if (userArgs.length < effectiveRequiredCount) {
@@ -47,48 +71,77 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const axiosCfg = { headers, timeout: 15000 };
 
     // === 构造 body ===
-    const buildBody = (merchantNo) => {
-      const body = { merchantNo };
+    const buildBody = (merchantNoOrNos) => {
+      const body = {};
 
-      // 1. 先处理用户可能传的「命名参数」（如：orderNo=123 amount=500）
+      //1.默认参数
+      params.forEach(p => {
+        if (p.parameter_value !== null && p.parameter_value !== undefined) {
+          body[p.parameter_name] = p.parameter_value;
+        }
+      });
+      // 2. 用户覆盖参数
+      // 处理位置参数
+      //TODO 这个之后需要更改
+      const firstArg = userArgs[0];
+      if (firstArg && !isNaN(Number(firstArg))) {
+        body.timeSpan = Number(firstArg);
+      }
+
+      // 处理 key=value 参数（兼容其他参数）
       userArgs.forEach(arg => {
-        if (typeof arg === 'string' && arg.includes('=')) {
-          const [key, ...valParts] = arg.split('=');
-          const value = valParts.join('=').trim(); // 支持 value 中包含 = 的情况
-          if (key && value) {
-            body[key.trim()] = value;
-          }
+        if (typeof arg === "string" && arg.includes("=")) {
+          const [k, ...v] = arg.split("=");
+          body[k.trim()] = v.join("=").trim();
         }
       });
 
-      // 2. 再处理位置参数（传统顺序参数）
-      let positionalIndex = 0;
-      params.forEach(param => {
-        const name = param.parameter_name;
-        // 如果已经被命名参数覆盖了，就跳过
-        if (body.hasOwnProperty(name)) return;
-
-        // 否则尝试用位置参数填充
-        if (positionalIndex < userArgs.length) {
-          const arg = userArgs[positionalIndex];
-          // 如果这个位置参数看起来是「key=value」形式，就跳过（留给上面处理）
-          if (typeof arg === 'string' && arg.includes('=')) {
-            // do nothing
-          } else {
-            body[name] = arg ?? "";
-            positionalIndex++;
-          }
-        }
-      });
+      //3.自动商户参数
+      if (Array.isArray(merchantNoOrNos)) {
+        body.merchantNos = merchantNoOrNos;
+      } else {
+        body.merchantNo = merchantNoOrNos;
+      }
 
       return body;
     };
 
-    // === 执行请求 ===
+    //如果是批量商户调一个接口
+    if (isBatch) {
+      const merchantNos = merchants.map(m => m.merchantNo).filter(Boolean);
+      const body = buildBody(merchantNos);
+
+      let resp;
+      try {
+        resp = await axios({
+          url: command.url,
+          method,
+          data: body,
+          ...axiosCfg
+        });
+      } catch (e) {
+        console.warn(`[batch command error]`, e?.message);
+        return;
+      }
+
+      if (resp?.data?.code !== 0) return;
+
+      let data = resp.data.data;
+
+      // 只对特定命令做格式化
+      const formatter = batchFormatters[command.identifier];
+      if (formatter) {
+        data = formatter(data, command, userArgs, params);
+      }
+
+      return await formatResult(command, data);
+    }
+
+    // === 执行请求(sing 模式) ===
     const doRequest = async (merchantNo) => {
       const body = buildBody(merchantNo);
       let response;
-      console.info(`【requestErsanUrl doRequest】${body}`)
+      console.info(`【requestErsanUrl doRequest】${body}`);
       try {
         if (method === "GET") {
           response = await axios.get(command.url, { ...axiosCfg, params: body });
@@ -288,7 +341,7 @@ function normalizeMchOrderStatData(data) {
     // 全天
     allDaySuccessCount: item.allDayPayInStat?.successCount ?? 0,
     allDayTotalCount: item.allDayPayInStat?.totalCount ?? 0,
-    allDaySuccessRate: ((item.allDayPayInStat?.successRate ?? 0) * 100).toFixed(1),
+    allDaySuccessRate: ((item.allDayPayInStat?.successRate ?? 0) * 100).toFixed(1)
   });
 
   return Array.isArray(data) ? data.map(mapOne) : mapOne(data);

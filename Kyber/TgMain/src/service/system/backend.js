@@ -2,6 +2,8 @@ const axios = require("axios");
 const { getErsanToken } = require("../../service/handle/handleOrder");
 const { redis } = require("../../models/redisModel");
 
+const baseUrl = `https://api.gamecloud.vip`
+
 async function callbackBackend(applicationNo, approver, status) {
   const url = `https://api.gamecloud.vip/admin-api/plt/tg/withdraw/platCheck`;
   //const url = `https://api.pay.ersan.click/admin-api/plt/tg/withdraw/platCheck`;
