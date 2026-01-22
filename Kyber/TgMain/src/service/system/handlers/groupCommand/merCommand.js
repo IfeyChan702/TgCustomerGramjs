@@ -9,9 +9,7 @@ const { redis } = require("../../../../models/redisModel");
 const AUTO_FILLED_PARAMS = new Set(["merchantNo"]);
 
 const batchFormatters = {
-
   withdrawstat: (data, command, userArgs, params = []) => {
-
     let timeSpanArg =
       userArgs.find(a => a.startsWith("timeSpan="))?.split("=")[1] ||
       userArgs.find(a => a.startsWith("minutes="))?.split("=")[1];
@@ -24,8 +22,21 @@ const batchFormatters = {
     }
 
     const timeSpan = Number(timeSpanArg ?? command?.default_timeSpan ?? 10);
-
     data.timeSpan = Number.isFinite(timeSpan) ? timeSpan : 10;
+
+    // 🔥 格式化 withdrawOrderList 为明细列表
+    if (Array.isArray(data.withdrawOrderList) && data.withdrawOrderList.length > 0) {
+      data.withdrawList = data.withdrawOrderList
+        .map((item, idx) =>
+          `<b>${idx + 1}.</b> 订单号：<code>${item.no}</code>\n` +
+          `    💵 实付金额：${item.paymentCyptoAmount} ${item.currency}\n` +
+          `    💱 汇率：${item.usdtRate}\n` +
+          `    💰 USDT：${item.applyCryptoAmount}`
+        )
+        .join("\n\n");
+    } else {
+      data.withdrawList = "🔍 <i>暂无提现记录</i>";
+    }
 
     return data;
   }
