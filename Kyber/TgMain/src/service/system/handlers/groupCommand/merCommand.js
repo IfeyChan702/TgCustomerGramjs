@@ -29,13 +29,13 @@ const batchFormatters = {
       data.withdrawList = data.withdrawOrderList
         .map((item, idx) =>
           `<b>${idx + 1}.</b> 订单号：<code>${item.no}</code>\n` +
-          `    💵 实付金额：${item.paymentCyptoAmount} ${item.currency}\n` +
-          `    💱 汇率：${item.usdtRate}\n` +
-          `    💰 USDT：${item.applyCryptoAmount}`
+          `    实付金额：${item.paymentCyptoAmount} ${item.currency}\n` +
+          `    汇率：${item.usdtRate}\n` +
+          `    USDT：<b><u>${item.applyCryptoAmount}</u></b>`
         )
         .join("\n\n");
     } else {
-      data.withdrawList = "🔍 <i>暂无提现记录</i>";
+      data.withdrawList = "<i>暂无提现记录</i>";
     }
 
     return data;
