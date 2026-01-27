@@ -42,6 +42,12 @@ async function requestUrl(command, userArgs, inputCommand, client, chatId) {
       response = await axios.post(command.url, body);
     }
 
+
+    if (response.data.code !== 200){
+      console.warn(`[WARN]接口返回code非200:`,response.data);
+      return
+    }
+
     const resText = JSON.stringify(response.data, null, 2);
     await client.sendMessage(chatId, {
       message: `✅ 请求成功:\n${resText}`

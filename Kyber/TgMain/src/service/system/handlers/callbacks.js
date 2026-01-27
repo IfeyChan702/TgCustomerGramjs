@@ -1,9 +1,17 @@
 // handlers/callbacks.js
 const { verify } = require("../security");
-const { callbackBackend, callbackAppStatus,callbackAccountStatus } = require("../backend");
-const { tryDecide, isDecided, isReviewer, getStageStatus, saveStageStatus, isApprover,ensureOrderKeys } = require("../reviewStore");
+const { callbackBackend, callbackAppStatus, callbackAccountStatus } = require("../backend");
+const {
+  tryDecide,
+  isDecided,
+  isReviewer,
+  getStageStatus,
+  saveStageStatus,
+  isApprover,
+  ensureOrderKeys
+} = require("../reviewStore");
 const { approvedSuffix, approveKeyboard, formatWithdrawCard, auditKeyboard } = require("../ui");
-const sysWithdrawContextService = require("../sysWithdrawContextService")
+const sysWithdrawContextService = require("../sysWithdrawContextService");
 const merChatService = require("../sysMerchantChatService");
 const { onMerchantCallback } = require("./merchantWizardHandler");
 
@@ -130,7 +138,7 @@ function registerCallbackHandler(bot) {
           usdtFinal,
           isSameAddress,
           optType,
-          isConfirmInfo:false
+          isConfirmInfo: false
         });
         log("editMessageText start (okAudit)");
         await ctx.reply(
@@ -164,7 +172,7 @@ function registerCallbackHandler(bot) {
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
-          } catch(err) {
+          } catch (err) {
             warn("editMessageText failed (progress)", err?.message || err);
           }
           return;
@@ -209,7 +217,7 @@ function registerCallbackHandler(bot) {
         }
 
         if (reviewInfo.decided) {
-          warn("该订单已处理", { show_alert: true })
+          warn("该订单已处理", { show_alert: true });
           return await ctx.answerCbQuery("该订单已处理", { show_alert: true });
         }
 
@@ -226,7 +234,7 @@ function registerCallbackHandler(bot) {
         reviewInfo.approvedBy = approved;
 
         log("saveStageStatus start", { stage: "approve", approvedLen: approved.length, needCount });
-        await saveStageStatus(orderId, "approve",reviewInfo);
+        await saveStageStatus(orderId, "approve", reviewInfo);
         log("saveStageStatus done", { stage: "approve" });
 
         const currentCount = approved.length;
@@ -266,7 +274,7 @@ function registerCallbackHandler(bot) {
         reviewInfo.decided = true;
         await saveStageStatus(orderId, "approve", reviewInfo);
         log("saveStageStatus start (complete)");
-        await saveStageStatus(orderId,"complete", reviewInfo);
+        await saveStageStatus(orderId, "complete", reviewInfo);
         log("saveStageStatus done (complete)");
 
         log("tryDecide start");
@@ -277,7 +285,7 @@ function registerCallbackHandler(bot) {
         log("callback backend/account start", { type });
         if (type === 4) {
           ok = await callbackBackend(orderId, approver, 1);
-        } else if ([1, 2, 3, 5].includes(type)) {
+        } else if ([1, 2, 3, 5, 6].includes(type)) {
           ok = await callbackAccountStatus(orderId, approver, 1, type);
         } else {
           errl("type 超出范围", { type });
@@ -292,7 +300,7 @@ function registerCallbackHandler(bot) {
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 订单处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
-          } catch (err){
+          } catch (err) {
             warn("editMessageText failed (final fail)", err?.message || err);
           }
           return;
@@ -327,7 +335,7 @@ function registerCallbackHandler(bot) {
         log("callback backend/account start", { type });
         if (type === 4) {
           ok = await callbackBackend(orderId, approver, 2);
-        } else if ([1, 2, 3, 5].includes(type)) {
+        } else if ([1, 2, 3, 5, 6].includes(type)) {
           ok = await callbackAccountStatus(orderId, approver, 2, type);
         } else {
           errl("type 超出范围", { type });
@@ -343,7 +351,7 @@ function registerCallbackHandler(bot) {
               (ctx.callbackQuery.message.text || "") + "\n<b>⚠️ 处理失败，请重新提交</b>",
               { parse_mode: "HTML" }
             );
-          } catch(err) {
+          } catch (err) {
             warn("editMessageText failed (reject fail)", err?.message || err);
           }
           return;
@@ -366,6 +374,7 @@ function registerCallbackHandler(bot) {
     }
   });
 }
+
 async function getWithdrawInfo(orderId, merchantNo) {
   try {
     const data = await sysWithdrawContextService.findByOrderIdAndMerchantNo(orderId, merchantNo);
@@ -375,8 +384,8 @@ async function getWithdrawInfo(orderId, merchantNo) {
     }
 
     const time = new Date(data.applyTime)
-      .toLocaleString('en-CA', { timeZone: 'Asia/Kolkata', hour12: false })
-      .replace(', ', ' ');
+      .toLocaleString("en-CA", { timeZone: "Asia/Kolkata", hour12: false })
+      .replace(", ", " ");
 
     return {
       merchantName: data.merchantName,
@@ -397,4 +406,5 @@ async function getWithdrawInfo(orderId, merchantNo) {
     return null;
   }
 }
+
 module.exports = { registerCallbackHandler };

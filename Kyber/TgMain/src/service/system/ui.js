@@ -142,6 +142,59 @@ function formatInternalRequestCard({ orderId, amount, currency, applyTime, opera
   ].filter(Boolean).join("\n");
 }
 
+/**
+ * 格式化批量转账订单卡片
+ */
+function formatBatchTransferCard({
+                                   orderId,
+                                   merchantName,
+                                   accountNo,
+                                   amount,
+                                   currency,
+                                   balanceBefore,
+                                   balanceAfter,
+                                   applyTime,
+                                   operator,
+                                   remark = "",
+                                   detailList = [], // 子订单列表
+                                   detailItemCount
+                                 }) {
+  const MAX_DISPLAY = 5; // 最多显示5条
+  const transferCount = detailList.length;
+
+  const remarkLine = remark ? `\n<strong>备注：</strong> ${remark}` : "";
+
+  // 构建子订单明细
+  let detailText = "";
+  if (detailList.length > 0) {
+    detailText += "\n\n<b>━━━━ 转账明细 ━━━━</b>\n";
+
+    const displayList = detailList.slice(0, MAX_DISPLAY);
+    displayList.forEach((detail, index) => {
+      detailText += `\n<b>${index + 1}. ${detail.payeeUserName}</b>\n`;
+      detailText += `   账号: <code>${detail.payeeAccount}</code>\n`;
+      detailText += `   IFSC: <code>${detail.payeeIfsc}</code>\n`;
+      detailText += `   金额: <b>${detail.transferAmount} ${currency}</b>\n`;
+    });
+
+    if (transferCount > MAX_DISPLAY) {
+      detailText += `\n<i>...还有 ${transferCount - MAX_DISPLAY} 笔转账</i>\n`;
+    }
+  }
+
+  return `<b>💸 批量转账申请</b>\n\n` +
+    `<strong>订单号：</strong> <code>${orderId}</code>\n` +
+    `<strong>商户：</strong> <code>${merchantName}</code>\n` +
+    `<strong>账户号：</strong> <code>${accountNo}</code>\n` +
+    `<strong>操作人：</strong> <code>${operator}</code>\n` +
+    `<strong>时间：</strong> <code>${applyTime}</code>\n\n` +
+    `<strong>转账笔数：</strong> <b>${detailItemCount}</b> 笔\n` +
+    `<strong>总金额：</strong> <b>${amount} ${currency}</b>\n` +
+    `<strong>操作前余额：</strong> <b>${balanceBefore} ${currency}</b>\n` +
+    `<strong>操作后余额：</strong> <b>${balanceAfter} ${currency}</b>\n` +
+    `${remarkLine}` +
+    `${detailText}`;
+}
 
 function approvedSuffix(ts) {
   return `\n\n✅ 订单已确认,请稍等! \n时间：${ts}`;
@@ -208,5 +261,6 @@ module.exports = {
   formatWithdrawCard,
   auditKeyboard,
   formatOrderCard,
-  formatInternalRequestCard
+  formatInternalRequestCard,
+  formatBatchTransferCard
 };

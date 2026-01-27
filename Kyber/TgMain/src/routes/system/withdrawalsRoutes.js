@@ -5,7 +5,8 @@ const {
   formatWithdrawCard,
   auditKeyboard,
   formatOrderCard,
-  formatInternalRequestCard
+  formatInternalRequestCard,
+  formatBatchTransferCard
 } = require("../../service/system/ui");
 const { success, fail } = require("../../utils/responseWrapper");
 const merChatService = require("../../service/system/sysMerchantChatService");
@@ -179,7 +180,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         usdtFinal: esc(usdtFinal),
         finalIsSameAddress,
         optType: esc(optType),
-        isConfirmInfo:true
+        isConfirmInfo: true
       });
 
       await bot.telegram.sendMessage(
@@ -222,7 +223,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         merchantName,
         accountNo,
         orderId,
-        optType,
+        optType,//6是转账
         amount,
         currency,
         balanceBefore,
@@ -230,13 +231,15 @@ module.exports = function createWithdrawalsRouter(bot) {
         remark = "",
         applyTime,
         operator,
-        channelName
+        channelName,
+        detailItemCount,
+        detailInfo //批量转账的相信信息
       } = req.body || {};
 
       const optTypeNum = Number(optType);
 
-      if (![1, 2, 3, 5].includes(optTypeNum)) {
-        return res.json(fail("optType 必须是: 1,2,3,5"));
+      if (![1, 2, 3, 5, 6].includes(optTypeNum)) {
+        return res.json(fail("optType 必须是: 1,2,3,5,6"));
       }
 
       if (optTypeNum === 5) {
@@ -257,7 +260,7 @@ module.exports = function createWithdrawalsRouter(bot) {
         const applyTimeStr = formatDate(applyTime || Date.now());
 
         if (approveIds?.length) {
-          console.log('/order/create,setApprovers{}',approveIds)
+          console.log("/order/create,setApprovers{}", approveIds);
           await setApprovers(orderId, approveIds, 1);
         }
 
@@ -276,6 +279,79 @@ module.exports = function createWithdrawalsRouter(bot) {
         });
 
         return res.json(success("提交成功"));
+      }
+      // ===== 这里是原有 6 的处理 =====
+      if (optTypeNum === 6) {
+        const required6 = {
+          merchantNo,
+          merchantName,
+          accountNo,
+          orderId,
+          amount,
+          currency,
+          balanceBefore,
+          balanceAfter,
+          detailItemCount,
+          operator
+          //detailInfo
+        };
+
+        const missing6 = Object.entries(required6)
+          .filter(([_, v]) => v === undefined || v === null || String(v).trim() === "")
+          .map(([k]) => k);
+
+        if (missing6.length > 0){
+          return res.json(fail(`缺少必填参数: ${missing6.join(", ")}`));
+        }
+
+        let detailList = [];
+        if(detailInfo){
+          try {
+            detailList = JSON.parse(detailInfo);
+            if (!Array.isArray(detailList) || detailList.length === 0){
+              return res.json(fail("detailInfo 必须是非空数组"))
+            }
+
+            const totalAmount = detailList.reduce((sum, item) => sum + Number(item.transferAmount || 0), 0);
+            if (totalAmount !== Number(amount)) {
+              return res.json(fail(`子订单金额总和(${totalAmount})与订单总金额(${amount})不一致`));
+            }
+          }catch (e) {
+            return res.json(fail("detailInfo 格式错误，必须是有效的JSON数组"));
+          }
+        }
+
+        const chatInfo = await merChatService.getChatInfoByMerchant(merchantNo);
+        const { chatId,approveIds } = chatInfo
+        if (!chatInfo?.chatId) {
+          return res.json(fail("商户未配置 TG 群聊"));
+        }
+        const  applyTimeStr = formatDate(applyTime || Date.now())
+        if (approveIds?.length) {
+          console.log("/order/create [批量转账] setApprovers:", approveIds);
+          await setApprovers(orderId, approveIds, 1);
+        }
+
+        const text = formatBatchTransferCard({
+          orderId,
+          merchantName,
+          accountNo,
+          amount,
+          currency,
+          balanceBefore,
+          balanceAfter,
+          applyTime: applyTimeStr,
+          operator,
+          remark,
+          detailList,
+          detailItemCount
+        });
+
+        await bot.telegram.sendMessage(chatId,text,{
+          parse_mode:"HTML",
+          ...approveKeyboard(orderId,merchantNo,6)
+        })
+        return res.json(success("批量转账订单提交成功"));
       }
 
       // ===== 这里是原有 1/2/3 的处理 =====
