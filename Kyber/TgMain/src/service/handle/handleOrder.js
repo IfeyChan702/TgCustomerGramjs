@@ -75,7 +75,9 @@ async function getErsanToken(redis) {
     }
     //https://api.pay.ersan.click/admin-api/system/auth/login测试环境
     const loginUrl = "https://api.gamecloud.vip/admin-api/system/auth/login";
+    //const loginUrl = "https://api.pay.ersan.click/admin-api/system/auth/login";
     const loginBody = { type: 0, username: "robot", password: "Apple_Rob@op*" };
+    //const loginBody = { type: 0, username: "robot", password: "robot132456" };
 
     const resp = await axios.post(loginUrl, loginBody);
     console.log(`getErsanToken 中 respond 返回的code = ${resp.data.code}，data = ${resp.data}`)
