@@ -152,15 +152,30 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const doRequest = async (merchantNo) => {
       const body = buildBody(merchantNo);
       let response;
-      console.info(`【requestErsanUrl doRequest】${body}`);
+      //请求前日志
+      console.info(`【requestErsanUrl doRequest】请求体: ${JSON.stringify(body)}`);
+      console.info(`【requestErsanUrl doRequest】商户号: ${merchantNo}, 请求方法: ${method}, 请求URL: ${command.url}`);
+
       try {
         if (method === "GET") {
           response = await axios.get(command.url, { ...axiosCfg, params: body });
         } else {
           response = await axios.post(command.url, body, axiosCfg);
         }
+        //请求成功日志
+        const duration = Date.now() - startTime;
+        console.info(`【requestErsanUrl doRequest】商户 ${merchantNo} 请求成功, 耗时: ${duration}ms`);
+        console.info(`【requestErsanUrl doRequest】响应状态: ${response.status}, 响应数据: ${JSON.stringify(response.data)}`);
       } catch (e) {
-        console.warn(`[merCommand requestErsanUrl] 商户 ${merchantNo} 请求异常: ${e?.message || e}`);
+        //请求异常日志
+        const duration = Date.now() - startTime;
+        console.warn(`[merCommand requestErsanUrl] 商户 ${merchantNo} 请求异常, 耗时: ${duration}ms`);
+        console.warn(`[merCommand requestErsanUrl] 异常信息: ${e?.message || e}`);
+        console.warn(`[merCommand requestErsanUrl] 异常详情: ${JSON.stringify({
+          url: command.url,
+          method,
+          error: e?.response?.data || e?.message
+        })}`);
         return { result: null, orderNotFound: false };
       }
 
