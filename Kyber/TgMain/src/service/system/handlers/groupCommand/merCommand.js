@@ -85,29 +85,39 @@ async function requestErsanUrl(command, userArgs, chatId) {
     const buildBody = (merchantNoOrNos) => {
       const body = {};
 
-      //1.默认参数
-      params.forEach(p => {
-        if (p.parameter_value !== null && p.parameter_value !== undefined) {
-          body[p.parameter_name] = p.parameter_value;
+      params.forEach((p, index) => {
+        const userValue = userArgs[index];
+
+        if (userValue !== undefined && userValue !== null && userValue !== "") {
+          if (typeof userValue === "string" && userValue.includes("=")) {
+            const [k, ...v] = userValue.split("=");
+            const key = k.trim();
+            const value = v.join("=").trim();
+            if (key && value !== "") {
+              body[key] = value;
+            }
+          } else {
+            body[p.parameter_name] = userValue;
+          }
+        } else {
+          if (p.parameter_value !== null && p.parameter_value !== undefined) {
+            body[p.parameter_name] = p.parameter_value;
+          }
         }
       });
-      // 2. 用户覆盖参数
-      // 处理位置参数
-      //TODO 这个之后需要更改
-      const firstArg = userArgs[0];
-      if (firstArg && !isNaN(Number(firstArg))) {
-        body.timeSpan = Number(firstArg);
-      }
 
-      // 处理 key=value 参数（兼容其他参数）
-      userArgs.forEach(arg => {
+      for (let i = params.length; i < userArgs.length; i++) {
+        const arg = userArgs[i];
         if (typeof arg === "string" && arg.includes("=")) {
           const [k, ...v] = arg.split("=");
-          body[k.trim()] = v.join("=").trim();
+          const key = k.trim();
+          const value = v.join("=").trim();
+          if (key && value !== "") {
+            body[key] = value;
+          }
         }
-      });
+      }
 
-      //3.自动商户参数
       if (Array.isArray(merchantNoOrNos)) {
         body.merchantNos = merchantNoOrNos;
       } else {
@@ -127,7 +137,7 @@ async function requestErsanUrl(command, userArgs, chatId) {
         resp = await axios({
           url: command.url,
           method,
-          data: body,
+          [method === "GET" ? "params" : "data"]: body,
           ...axiosCfg
         });
       } catch (e) {
@@ -151,16 +161,32 @@ async function requestErsanUrl(command, userArgs, chatId) {
     // === 执行请求(sing 模式) ===
     const doRequest = async (merchantNo) => {
       const body = buildBody(merchantNo);
+      const startTime = Date.now();
       let response;
-      console.info(`【requestErsanUrl doRequest】${body}`);
+      //请求前日志
+      console.info(`【requestErsanUrl doRequest】请求体: ${JSON.stringify(body)}`);
+      console.info(`【requestErsanUrl doRequest】商户号: ${merchantNo}, 请求方法: ${method}, 请求URL: ${command.url}`);
+
       try {
         if (method === "GET") {
           response = await axios.get(command.url, { ...axiosCfg, params: body });
         } else {
           response = await axios.post(command.url, body, axiosCfg);
         }
+        //请求成功日志
+        const duration = Date.now() - startTime;
+        console.info(`【requestErsanUrl doRequest】商户 ${merchantNo} 请求成功, 耗时: ${duration}ms`);
+        console.info(`【requestErsanUrl doRequest】响应状态: ${response.status}, 响应数据: ${JSON.stringify(response.data)}`);
       } catch (e) {
-        console.warn(`[merCommand requestErsanUrl] 商户 ${merchantNo} 请求异常: ${e?.message || e}`);
+        //请求异常日志
+        const duration = Date.now() - startTime;
+        console.warn(`[merCommand requestErsanUrl] 商户 ${merchantNo} 请求异常, 耗时: ${duration}ms`);
+        console.warn(`[merCommand requestErsanUrl] 异常信息: ${e?.message || e}`);
+        console.warn(`[merCommand requestErsanUrl] 异常详情: ${JSON.stringify({
+          url: command.url,
+          method,
+          error: e?.response?.data || e?.message
+        })}`);
         return { result: null, orderNotFound: false };
       }
 
