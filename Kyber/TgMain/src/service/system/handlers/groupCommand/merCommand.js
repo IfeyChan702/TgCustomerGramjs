@@ -7,6 +7,28 @@ const { redis } = require("../../../../models/redisModel");
 
 
 const AUTO_FILLED_PARAMS = new Set(["merchantNo"]);
+/**
+ * 格式化金额（添加千位分隔符）
+ * @param {number|string} num - 金额
+ * @returns {string} - 格式化后的金额，如 10000 -> 10,000
+ */
+function formatAmount(num) {
+  if (num === undefined || num === null || num === '') return '0';
+  const number = Number(num);
+  if (isNaN(number)) return String(num);
+
+  const [intPart, decPart] = String(number).split('.');
+
+  const formatted = intPart.replace(/\B(?=(\d{4})+(?!\d))/g, ',');
+
+  return decPart ? `${formatted}.${decPart}` : formatted;
+}
+
+const AMOUNT_FIELDS = new Set([
+  'balance',
+  'balanceActive',
+  'balanceFreeze'
+]);
 
 const batchFormatters = {
   withdrawstat: (data, command, userArgs, params = []) => {
@@ -316,28 +338,41 @@ async function formatResult(command, data) {
   const formatCfg = await tgComFormatService.getFormatByCommandId(command.id);
   let result = "";
 
+  // 对金额字段进行格式化
+  const formatData = (item) => {
+    const formatted = { ...item };
+    for (const key of Object.keys(formatted)) {
+      if (AMOUNT_FIELDS.has(key)) {
+        formatted[key] = formatAmount(formatted[key]);
+      }
+    }
+    return formatted;
+  };
+
   if (Array.isArray(data)) {
+    const formattedData = data.map(formatData);
     if (formatCfg?.format_template) {
-      result = data.map(item =>
+      result = formattedData.map(item =>
         formatCfg.format_template
           .replace(/\{(\w+)\}/g, (_, key) => (item[key] ?? ""))
           .replace(/\\n/g, "\n")
           .replace(/\r/g, "")
       ).join("\n\n");
     } else {
-      const keys = Object.keys(data[0] || {});
+      const keys = Object.keys(formattedData[0] || {});
       const header = keys.join(" | ");
-      const lines = data.map(row => keys.map(k => row[k] ?? "").join(" | "));
+      const lines = formattedData.map(row => keys.map(k => row[k] ?? "").join(" | "));
       result = [header, ...lines].join("\n");
     }
   } else if (typeof data === "object") {
+    const formattedData = formatData(data);
     if (formatCfg?.format_template) {
       result = formatCfg.format_template
-        .replace(/\{(\w+)\}/g, (_, key) => data[key] ?? "")
+        .replace(/\{(\w+)\}/g, (_, key) => formattedData[key] ?? "")
         .replace(/\\n/g, "\n")
         .replace(/\r/g, "");
     } else {
-      result = JSON.stringify(data, null, 2);
+      result = JSON.stringify(formattedData, null, 2);
     }
   }
 
