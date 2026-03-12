@@ -324,7 +324,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
         console.warn("没有可用的 token，无法请求接口");
         return;
       }
-      console.log(`handleMerchantOrderMessage,调用登录接口的token=${token}`)
+      console.log(`handleMerchantOrderMessage,调用登录接口的token=${token}`);
       response = await axios.get(
         `https://api.gamecloud.vip/admin-api/plt/order-in/get/${orderId}`,
         {
@@ -339,9 +339,9 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 
     const raw = response.data || {};
     const data = raw.data || raw;
-    if (data.data === null){
-      console.error(`data=null,response=${response}`)
-      return
+    if (data.data === null) {
+      console.error(`data=null,response=${response}`);
+      return;
     }
     const channelId = data.channel_id || data.channelId || "未获得到渠道ID";
     const channelName = data.channel_name || data.channelName || "未知渠道";
@@ -388,12 +388,14 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
     if (!channelGroupIds.has(String(chatId))) return;
 
+    const replyToId = message.replyTo?.replyToMsgId;
+    if (!replyToId) return;
+
+    console.log(`[DEBUG] 收到回复消息 msgId:${message.id}, replyToId:${replyToId}, 群:${chatTitle}(${chatId})`);
+
     const replyKey = `replyfwd:${chatId}:${message.id}`;
     const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 30);
     if (!ok) return;
-
-    const replyToId = message.replyTo?.replyToMsgId;
-    if (!replyToId) return;
 
     //做一个“时效窗口”防止离线历史消息回放
     const now = Date.now();
@@ -402,9 +404,11 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
 
     const context = await tgDbService.getOrderByChannelMsgId(replyToId);
     //const context = orderContextMap.get(replyToId);
+    console.log(`[DEBUG] 查询上下文 replyToId:${replyToId}, context:${JSON.stringify(context)}`);
 
     if (context && context.merchant_msg_id && context.merchant_chat_id) {
-      const replyContent = message.message || "";
+      const replyContent = (message.message || "").trim();
+      if (!replyContent) return;
       const replyText = await tgDbService.getReplyText(replyContent);
       let replyId = null;
 
@@ -415,11 +419,12 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
         console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
       } else {
         replyId = replyText.id;
-        await client.sendMessage(context.merchant_chat_id, {
+        console.log(`[DEBUG] 语料库匹配 replyId:${replyId}, 原文:"${replyContent}" → 回复:"${replyText.reply_text}", 目标群:${context.merchant_chat_id}, 目标消息:${context.merchant_msg_id}`);
+        await client.sendMessage(BigInt(context.merchant_chat_id), {
           message: replyText.reply_text,
-          replyTo: context.merchant_msg_id
+          replyTo: Number(context.merchant_msg_id)
         });
-        console.log(`[INFO] 回复已转发回原群 ${context.fromChat} 并引用消息 ${context.originalMsgId}`);
+        console.log(`[INFO] 回复已转发回原群 ${context.merchant_chat_id} 并引用消息 ${context.merchant_msg_id}`);
         await tgDbService.updateOrderStatusByChannelMsgId(replyToId, replyId);
       }
     } else {
