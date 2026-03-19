@@ -420,28 +420,39 @@ const getPendingOrders = async () => {
  */
 const checkAndProcessOrder = async (merchantOrderId) => {
 
-  const selectSql = `SELECT id, status
-                     FROM tg_order
-                     WHERE merchant_order_id = ? AND status = 0 LIMIT 1`;
+  const selectSql = `SELECT id, status FROM tg_order WHERE merchant_order_id = ?`;
   const orders = await queryAsync(selectSql, [merchantOrderId]);
 
   if (!orders || orders.length === 0) {
     return { found: false };
   }
 
-  const order = orders[0];
+  const total = orders.length;
+  const pending = orders.filter(o => o.status === 0);
+  const processed = orders.filter(o => o.status === 1);
 
-  // 2. 更新状态
-  const updateSql = `UPDATE tg_order
-                     SET status = 1
-                     WHERE id = ?`;
-  const result = await queryAsync(updateSql, [order.id]);
-
-  if (result.affectedRows > 0) {
-    return { found: true, updated: true };
-  } else {
-    return { found: true, updated: false };
+  // 2. 全部已处理过
+  if (pending.length === 0) {
+    return {
+      found: true,
+      alreadyProcessed: true,
+      total,
+      processedCount: processed.length
+    };
   }
+
+  // 3. 批量更新所有未处理的记录
+  const pendingIds = pending.map(o => o.id);
+  const updateSql = `UPDATE tg_order SET status = 1 WHERE id IN (?) AND status = 0`;
+  const result = await queryAsync(updateSql, [pendingIds]);
+
+  return {
+    found: true,
+    updated: result.affectedRows > 0,
+    total,
+    updatedCount: result.affectedRows,
+    alreadyProcessedCount: processed.length
+  };
 };
 /**
  * 根据 status 查找账户信息

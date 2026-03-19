@@ -93,7 +93,7 @@ async function handleEvent(client, event, isRunning) {
         });
         return;
       }
-      if (message.message.startsWith("/已处理:")) {
+      if (/^\/已处理[：:]/.test(message.message)) {
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleProOrder(client, chatId, message);
         });
@@ -551,8 +551,8 @@ async function handleNoProOrder(client, chatId, message) {
  * @returns {Promise<void>}
  */
 async function handleProOrder(client, chatId, message) {
-  const parts = message.message.split(":");
-  const orderId = parts[1]?.trim();
+  const parts = message.message.replace(/：/g, ":").split(":");
+  const orderId = parts.slice(1).join(":").trim();
 
   if (!orderId) {
     await client.sendMessage(chatId, {
@@ -571,12 +571,15 @@ async function handleProOrder(client, chatId, message) {
     });
   } else if (result.alreadyProcessed) {
     await client.sendMessage(chatId, {
-      message: `✅ 订单 ${orderId} 已经处理过了，无需重复操作。`,
+      message: `✅ 订单 ${orderId} 共 ${result.total} 条记录，全部已处理过，无需重复操作。`,
       replyTo: message.id
     });
   } else if (result.updated) {
+    const msg = result.alreadyProcessedCount > 0
+      ? `✅ 订单 ${orderId} 共 ${result.total} 条记录，本次处理 ${result.updatedCount} 条，之前已处理 ${result.alreadyProcessedCount} 条。`
+      : `✅ 订单 ${orderId} 共 ${result.total} 条记录，已全部标记为已处理！`;
     await client.sendMessage(chatId, {
-      message: `✅ 订单 ${orderId} 已成功标记为已处理！`,
+      message: msg,
       replyTo: message.id
     });
   } else {
