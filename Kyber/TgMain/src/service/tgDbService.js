@@ -422,7 +422,7 @@ const checkAndProcessOrder = async (merchantOrderId) => {
 
   const selectSql = `SELECT id, status
                      FROM tg_order
-                     WHERE merchant_order_id = ? LIMIT 1`;
+                     WHERE merchant_order_id = ? AND status = 0 LIMIT 1`;
   const orders = await queryAsync(selectSql, [merchantOrderId]);
 
   if (!orders || orders.length === 0) {
@@ -430,9 +430,6 @@ const checkAndProcessOrder = async (merchantOrderId) => {
   }
 
   const order = orders[0];
-  if (order.status !== 0) {
-    return { found: true, alreadyProcessed: true };
-  }
 
   // 2. 更新状态
   const updateSql = `UPDATE tg_order
