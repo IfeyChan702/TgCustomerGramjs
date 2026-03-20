@@ -402,7 +402,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     const msgTs = getMsgTimestampMillis(message);
     if (now - msgTs > MAX_THREAD_AGE_MS) return;
 
-    const context = await tgDbService.getOrderByChannelMsgId(replyToId);
+    const context = await tgDbService.getOrderByChannelMsgId(replyToId, chatId);
     //const context = orderContextMap.get(replyToId);
     console.log(`[DEBUG] 查询上下文 replyToId:${replyToId}, context:${JSON.stringify(context)}`);
 
@@ -425,7 +425,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
           replyTo: Number(context.merchant_msg_id)
         });
         console.log(`[INFO] 回复已转发回原群 ${context.merchant_chat_id} 并引用消息 ${context.merchant_msg_id}`);
-        await tgDbService.updateOrderStatusByChannelMsgId(replyToId, replyId);
+        await tgDbService.updateOrderStatusByChannelMsgId(replyToId, chatId, replyId);
       }
     } else {
       console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);

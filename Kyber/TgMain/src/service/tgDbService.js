@@ -321,11 +321,11 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
 /**
  * 根据channelMsgId查询tg_order表的订单
  */
-const getOrderByChannelMsgId = async (channelMsgId) => {
+const getOrderByChannelMsgId = async (channelMsgId, targetChatId) => {
   const sql = `SELECT t.*
                FROM tg_order t
-               WHERE channel_msg_id = ?`;
-  const results = await queryAsync(sql, [channelMsgId]);
+               WHERE channel_msg_id = ? AND target_chat_id = ?`;
+  const results = await queryAsync(sql, [channelMsgId, targetChatId]);
   return results.length > 0 ? results[0] : null;
 };
 /**
@@ -334,7 +334,7 @@ const getOrderByChannelMsgId = async (channelMsgId) => {
  * @param newStatus
  * @returns {Promise<*>}
  */
-const updateOrderStatusByChannelMsgId = async (channelMsgId, replyId) => {
+const updateOrderStatusByChannelMsgId = async (channelMsgId, targetChatId, replyId) => {
   let sql = `
       UPDATE tg_order
       SET status = 1
@@ -347,8 +347,8 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId, replyId) => {
     values.push(replyId);
   }
 
-  sql += ` WHERE channel_msg_id = ?`;
-  values.push(channelMsgId);
+  sql += ` WHERE channel_msg_id = ? AND target_chat_id = ?`;
+  values.push(channelMsgId, targetChatId);
 
   try {
     const result = await queryAsync(sql, values);
