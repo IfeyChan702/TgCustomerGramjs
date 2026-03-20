@@ -292,7 +292,7 @@ const getAccountIdByTelegramId = async (telegramId) => {
 /**
  * 添加order数据
  */
-const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, channelGroupId, merchantOrderId) => {
+const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, channelGroupId, merchantOrderId,targetChatId) => {
 
   const sql = `
       INSERT INTO tg_order (channel_msg_id,
@@ -301,17 +301,18 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
                             channel_group_id,
                             status,
                             created_time,
-                            merchant_order_id)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+                            merchant_order_id,
+                            target_chat_id)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
   `;
-
   const values = [
     channelMsgId,
     merchantMsgId,
     merchantChatId,
     channelGroupId,
-    0, // status 設為 0
-    merchantOrderId
+    0,
+    merchantOrderId,
+    targetChatId
   ];
 
   const result = await queryAsync(sql, values);
@@ -362,16 +363,18 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId, replyId) => {
 /**
  * 根据 merchantId, channelId, merchantOrderId, channelOrderId
  */
-const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderId) => {
+const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderId, targetChatId) => {
   const sql = `SELECT COUNT(*) AS count
                FROM tg_order
                WHERE merchant_chat_id = ?
                  AND channel_group_id = ?
-                 AND merchant_order_id = ?`;
+                 AND merchant_order_id = ?
+                 AND target_chat_id = ?`;
   const values = [
     merchantChatId,
     channelGroupId,
-    merchantOrderId
+    merchantOrderId,
+    targetChatId
   ];
   const results = await queryAsync(sql, values);
   return results[0].count > 0;
@@ -379,7 +382,7 @@ const getOrderByMeChMoCo = async (merchantChatId, channelGroupId, merchantOrderI
 /**
  * 根据merchantId,channelId,merchantOrderId,channelOrderId这四个字段，修改channel_msg_id，merchant_msg_id这两个字段
  */
-const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantChatId, channelGroupId, merchantOrderId) => {
+const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchantChatId, channelGroupId, merchantOrderId, targetChatId) => {
   const sql = `
       UPDATE tg_order
       SET channel_msg_id  = ?,
@@ -387,14 +390,9 @@ const updateMsgIdsByOrderKey = async (newChannelMsgId, newMerchantMsgId, merchan
       WHERE merchant_chat_id = ?
         AND channel_group_id = ?
         AND merchant_order_id = ?
+        AND target_chat_id = ?
   `;
-  const values = [
-    newChannelMsgId,
-    newMerchantMsgId,
-    merchantChatId,
-    channelGroupId,
-    merchantOrderId
-  ];
+  const values = [newChannelMsgId, newMerchantMsgId, merchantChatId, channelGroupId, merchantOrderId, targetChatId];
 
   const result = await queryAsync(sql, values);
   return result.affectedRows;

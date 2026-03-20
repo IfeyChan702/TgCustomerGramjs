@@ -14,6 +14,7 @@ const clients = [];
 const ErrorGroupChatID = -4750453063;
 const orderChatId = -4856325360;//线上的命令群
 const MAX_THREAD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
 // 允许使用 success 命令的群
 const ALLOWED_SUCCESS_CHAT_IDS = new Set([
   "-4750453063",
@@ -72,7 +73,6 @@ async function handleEvent(client, event, isRunning) {
   const meId = String(me.id);
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
-  const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
 
   //TODO 逻辑可能有问题
   if (2 === isRunning) {
@@ -296,7 +296,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
     replyTo: message.id
   });
 
-  const orderId = message.message.trim();
+  const orderId = message.message.match(orderRegex)?.[0];
   console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
   try {
 
@@ -358,7 +358,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
         file: message.media,
         caption: `${orderNo}`
       });
-      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, orderNo);
+      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, orderNo, orderChatId);
       return;
     }
     // 群发图片
@@ -369,7 +369,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
           caption: `${orderNo}`
         });
 
-        await addOrUpdateOrder(sentMsg.id, message.id, chatId, channelId, orderNo);
+        await addOrUpdateOrder(sentMsg.id, message.id, chatId, channelId, orderNo, targetChatId);
 
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
@@ -496,16 +496,10 @@ async function isAuthorized(command, chatId) {
   }
 }
 
-async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId) {
+async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId, targetChatId) {
   try {
-    const exist = await tgDbService.getOrderByMeChMoCo(chatId, channelId, merchantOrderId);
-    if (!exist) {
-      await tgDbService.insertOrderContext(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId);
-      console.log(`[INFO] 插入新订单成功，商户ID: ${chatId}，订单: ${merchantOrderId}`);
-    } else {
-      await tgDbService.updateMsgIdsByOrderKey(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId);
-      console.log(`[WARN] 订单已存在，跳过插入，更改订单，商户ID: ${chatId}，商户订单: ${merchantOrderId}`);
-    }
+    await tgDbService.insertOrderContext(channelMessageId, merchantMessageId, chatId, channelId, merchantOrderId, targetChatId);
+    console.log(`[INFO] 插入订单成功，商户ID: ${chatId}，订单: ${merchantOrderId}，channel_msg_id: ${channelMessageId}`);
   } catch (err) {
     console.error(" 插入 tg_order 失敗:", err.message);
   }
