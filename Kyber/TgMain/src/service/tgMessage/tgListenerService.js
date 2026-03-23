@@ -74,6 +74,26 @@ async function handleEvent(client, event, isRunning) {
   const sender = await event.message.senderId;
   const senderTelegramID = String(sender);
 
+  console.log('╔═══════════════════════════════════════════════');
+  console.log('║ 新消息进来');
+  console.log('║ Chat ID     :', event.chatId?.toString?.() || '未知');
+  console.log('║ From ID     :', message.senderId?.toString?.() || '未知');
+  console.log('║ Msg ID      :', message.id);
+  console.log('║ Is reply?   :', !!message.replyTo);
+  if (message.replyTo) {
+    console.log('║   ↳ Reply to Msg ID :', message.replyTo.replyToMsgId);
+    console.log('║   ↳ Reply to top ID :', message.replyTo.replyToTopId);
+  }
+  console.log('║ Date        :', new Date(message.date * 1000).toISOString());
+  console.log('║ Text length :', message.message?.length || 0);
+  if (message.message?.trim()) {
+    console.log('║ Text preview:', message.message.trim().slice(0, 120) + (message.message.length > 120 ? '...' : ''));
+  }
+  if (message.media) {
+    console.log('║ Has media   :', message.media.className);
+  }
+  console.log('╚═══════════════════════════════════════════════');
+
   //TODO 逻辑可能有问题
   if (2 === isRunning) {
     await tgMsgHandle.recMsg(client, event);
@@ -389,10 +409,9 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     if (!channelGroupIds.has(String(chatId))) return;
 
     const replyToId = message.replyTo?.replyToMsgId;
+    console.log(`[handleChannelReply] 收到回复消息 msgId:${message.id}, 群:${chatTitle}(${chatId})`);
     if (!replyToId) return;
-
-    console.log(`[DEBUG] 收到回复消息 msgId:${message.id}, replyToId:${replyToId}, 群:${chatTitle}(${chatId})`);
-
+    console.log(`[handleChannelReply] replyToId:${replyToId}`)
     const replyKey = `replyfwd:${chatId}:${message.id}`;
     const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 30);
     if (!ok) return;
