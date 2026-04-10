@@ -94,26 +94,29 @@ async function handleEvent(client, event, isRunning) {
   }
   console.log('╚═══════════════════════════════════════════════');
 
-  //TODO 逻辑可能有问题
+  console.log(`[handleEvent] 开始处理 chatId:${chatId} title:"${chatTitle}" isRunning:${isRunning} meId:${meId} senderId:${senderTelegramID}`);
+
+  // ----------- isRunning=2：转发给 recMsg -----------
   if (2 === isRunning) {
+    console.log(`[handleEvent] → isRunning=2，转交 tgMsgHandle.recMsg 处理`);
     await tgMsgHandle.recMsg(client, event);
     return;
   }
 
-  // ----------- 命令查询“未处理”的订单 -----------
-  if (typeof message.message === "string"
-  ) {
-    //0是关闭，1是开启
-    //orderChatId
-    //TODO 这里的条件可能需要更改，（权限限添加之类的、或者是特定的群组）
+  // ----------- 命令查询"未处理"的订单 -----------
+  if (typeof message.message === "string") {
+    console.log(`[handleEvent] 文本消息，开始命令匹配 text:"${message.message.slice(0, 60)}"`);
+
     if (chatId === orderChatId) {
       if (message.message === "/未处理") {
+        console.log(`[handleEvent] → 命令：/未处理`);
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleNoProOrder(client, chatId, message);
         });
         return;
       }
       if (/^\/已处理[：:]/.test(message.message)) {
+        console.log(`[handleEvent] → 命令：/已处理`);
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleProOrder(client, chatId, message);
         });
@@ -122,6 +125,7 @@ async function handleEvent(client, event, isRunning) {
     }
 
     if (message.message === "/hello_chatId") {
+      console.log(`[handleEvent] → 命令：/hello_chatId`);
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         await handleChatIdOrder(client, chatId, message, chatTitle, chat);
       });
@@ -130,27 +134,28 @@ async function handleEvent(client, event, isRunning) {
 
     if (chatId === ErrorGroupChatID) {
       if (message.message === "/start") {
+        console.log(`[handleEvent] → 命令：/start`);
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleStartOrStopOrder(client, chatId, true, 0);
         });
         return;
       }
-
-
       if (message.message.startsWith("/start_")) {
+        console.log(`[handleEvent] → 命令：/start_id`);
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleStartOrderByID(client, chatId, message);
         });
         return;
       }
-
       if (message.message === "/stop") {
+        console.log(`[handleEvent] → 命令：/stop`);
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleStartOrStopOrder(client, chatId, false, 1);
         });
         return;
       }
       if (message.message.startsWith("/stop_")) {
+        console.log(`[handleEvent] → 命令：/stop_id`);
         await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
           await handleStopOrderByID(client, chatId, message);
         });
@@ -159,12 +164,12 @@ async function handleEvent(client, event, isRunning) {
     }
 
     if (message.message.startsWith("/success1")) {
-      // 群校验
+      console.log(`[handleEvent] → 命令：/success1`);
       if (!ALLOWED_SUCCESS_CHAT_IDS.has(String(chatId))) {
+        console.warn(`[handleEvent] ❌ /success1 群(${chatId})无权限`);
         await client.sendMessage(chatId, { message: "❌ 本群无权使用 /success1" });
         return;
       }
-
       const minutes = parseInt(message.message.replace("/success1", ""), 10) || 10;
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         await handleSuccess.requestUrl(client, chatId, minutes);
@@ -173,12 +178,12 @@ async function handleEvent(client, event, isRunning) {
     }
 
     if (message.message.startsWith("/success2")) {
-      // 群校验
+      console.log(`[handleEvent] → 命令：/success2`);
       if (!ALLOWED_SUCCESS_CHAT_IDS.has(String(chatId))) {
+        console.warn(`[handleEvent] ❌ /success2 群(${chatId})无权限`);
         await client.sendMessage(chatId, { message: "❌ 本群无权使用 /success2" });
         return;
       }
-
       const minutes = parseInt(message.message.replace("/success2", ""), 10) || 10;
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         await handleRate.requestUrl(client, chatId, minutes);
@@ -187,6 +192,7 @@ async function handleEvent(client, event, isRunning) {
     }
 
     if (message.message.startsWith("/")) {
+      console.log(`[handleEvent] → 自定义命令匹配：${message.message.split(" ")[0]}`);
       await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
         const parts = message.message.trim().split(/\s+/);
         const identifier = parts[0].replace("/", "");
@@ -207,37 +213,44 @@ async function handleEvent(client, event, isRunning) {
         }
       });
     }
+
+    console.log(`[handleEvent] 文本消息未命中任何命令，继续向下匹配`);
   }
 
   // ----------- 1. 标记渠道群 -----------
+  console.log(`[handleEvent] 检查分支1：标记渠道群 isSelf:${meId === senderTelegramID}`);
   if (
     meId === senderTelegramID &&
     typeof message.message === "string" &&
     message.message.startsWith("此群渠道群ID设为") &&
     message.message.includes("监听")
   ) {
+    console.log(`[handleEvent] → 进入分支1：标记渠道群`);
     await handleMarkChannelGroup(client, chatId, chatTitle, message.message);
     return;
   }
 
   // ----------- 2. 标记商户群 -----------
+  console.log(`[handleEvent] 检查分支2：标记商户群`);
   if (
     meId === senderTelegramID &&
     typeof message.message === "string" &&
     message.message.startsWith("此群标记为商户群") &&
     message.message.includes("监听")
   ) {
+    console.log(`[handleEvent] → 进入分支2：标记商户群`);
     await handleMarkMerchantGroup(client, chatId, chatTitle, message.message);
     return;
   }
 
   // ----------- 3. 来源群监听，转发带订单图片 -----------
-  if (
-    message.media?.className === "MessageMediaPhoto" &&
-    typeof message.message === "string" &&
-    message.message.trim().length > 0 &&
-    orderRegex.test(message.message)
-  ) {
+  const hasPhoto = message.media?.className === "MessageMediaPhoto";
+  const hasText = typeof message.message === "string" && message.message.trim().length > 0;
+  const hasOrderNo = orderRegex.test(message.message || "");
+  console.log(`[handleEvent] 分支判断 chatId:${chatId} hasPhoto:${hasPhoto} hasText:${hasText} hasOrderNo:${hasOrderNo} hasReply:${!!message.replyTo}`);
+
+  if (hasPhoto && hasText && hasOrderNo) {
+    console.log(`[handleEvent] → 进入分支3：图片订单转发`);
     await getOrRunMessageResponse(redis, chatId, message.id, 60, async () => { // 60秒足够
       await handleMerchantOrderMessage(client, chatId, message);
     });
@@ -246,11 +259,14 @@ async function handleEvent(client, event, isRunning) {
 
   // ----------- 4. 渠道群回复监听，转发回商户群 -----------
   if (message.replyTo && message.replyTo.replyToMsgId) {
+    console.log(`[handleEvent] → 进入分支4：渠道群回复转发 replyToMsgId:${message.replyTo.replyToMsgId}`);
     await getOrRunMessageResponse(redis, chatId, message.id, 60, async () => {
       await handleChannelReply(client, chatId, chatTitle, message);
     });
     return;
   }
+
+  console.log(`[handleEvent] ⚠️ 消息未匹配任何转发分支，已忽略 chatId:${chatId} msgId:${message.id}`);
 }
 
 // =================== 标记渠道群 =====================
@@ -302,7 +318,18 @@ async function handleMerchantOrderMessage(client, chatId, message) {
   const accountIdFromClient = await tgDbService.getAccountIdByTelegramId(String(me.id));
   const sourceGroupIds = await tgDbService.getAllChatIdsInMerchant();
 
-  if (!sourceGroupIds.has(String(chatId)) || !relevantAccountIds.has(accountIdFromClient)) return;
+  console.log(`[handleMerchantOrderMessage] chatId:${chatId} accountIdFromClient:${accountIdFromClient}`);
+  console.log(`[handleMerchantOrderMessage] sourceGroupIds:`, [...sourceGroupIds]);
+  console.log(`[handleMerchantOrderMessage] relevantAccountIds:`, [...relevantAccountIds]);
+
+  if (!sourceGroupIds.has(String(chatId))) {
+    console.warn(`[handleMerchantOrderMessage] ❌ 跳过：chatId(${chatId}) 不在商户群列表中`);
+    return;
+  }
+  if (!relevantAccountIds.has(accountIdFromClient)) {
+    console.warn(`[handleMerchantOrderMessage] ❌ 跳过：当前账号(${accountIdFromClient}) 不在该商户群的负责账号列表中`);
+    return;
+  }
 
   const srcKey = `srcfwd:${chatId}:${message.id}`;
   const isFirstForSource = await onceByKey(redis, srcKey, 0);
@@ -406,20 +433,36 @@ async function handleMerchantOrderMessage(client, chatId, message) {
 async function handleChannelReply(client, chatId, chatTitle, message) {
   try {
     const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
-    if (!channelGroupIds.has(String(chatId))) return;
+    console.log(`[handleChannelReply] 渠道群列表:`, [...channelGroupIds]);
+    if (!channelGroupIds.has(String(chatId))) {
+      console.warn(`[handleChannelReply] ❌ 跳过：chatId(${chatId}) 不在渠道群列表中，消息未转发`);
+      return;
+    }
 
     const replyToId = message.replyTo?.replyToMsgId;
-    console.log(`[handleChannelReply] 收到回复消息 msgId:${message.id}, 群:${chatTitle}(${chatId})`);
-    if (!replyToId) return;
-    console.log(`[handleChannelReply] replyToId:${replyToId}`)
+    console.log(`[handleChannelReply] ✅ 命中渠道群 收到回复消息 msgId:${message.id}, 群:${chatTitle}(${chatId})`);
+    if (!replyToId) {
+      console.warn(`[handleChannelReply] ❌ 跳过：replyToId 为空`);
+      return;
+    }
+    console.log(`[handleChannelReply] replyToId:${replyToId}`);
+
     const replyKey = `replyfwd:${chatId}:${message.id}`;
     const ok = await onceByKey(redis, replyKey, 60 * 60 * 24 * 30);
-    if (!ok) return;
+    if (!ok) {
+      console.warn(`[handleChannelReply] ❌ 跳过：Redis去重，该消息已处理过 key:${replyKey}`);
+      return;
+    }
 
-    //做一个“时效窗口”防止离线历史消息回放
+    //做一个"时效窗口"防止离线历史消息回放
     const now = Date.now();
     const msgTs = getMsgTimestampMillis(message);
-    if (now - msgTs > MAX_THREAD_AGE_MS) return;
+    const ageSec = Math.floor((now - msgTs) / 1000);
+    if (now - msgTs > MAX_THREAD_AGE_MS) {
+      console.warn(`[handleChannelReply] ❌ 跳过：消息超时，消息时间戳:${msgTs} 当前:${now} 超过7天(${ageSec}秒前)`);
+      return;
+    }
+    console.log(`[handleChannelReply] 消息时效检查通过，${ageSec}秒前发送`);
 
     const context = await tgDbService.getOrderByChannelMsgId(replyToId, chatId);
     //const context = orderContextMap.get(replyToId);
