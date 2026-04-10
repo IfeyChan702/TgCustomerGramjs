@@ -153,20 +153,20 @@ async function ensureOrderKeys(
   const sAudit = keyStageStatus("audit", orderId);
   const sApprove = keyStageStatus("approve", orderId);
 
-  // reviewers set
-  if ((await redis.exists(kR)) === 0) {
-    if (reviewerIds.length) {
-      await redis.sAdd(kR, reviewerIds.map(String));
-    } else {
-      // 没有 reviewerIds 就不创建空 set（空 set 无意义）
-    }
+  // reviewers set：每次都用最新的数据库配置覆盖，确保新增/删除的 ID 实时生效
+  if (reviewerIds.length) {
+    await redis.del(kR);
+    await redis.sAdd(kR, reviewerIds.map(String));
+    await redis.expire(kR, ttlSec);
   }
 
-  // approvers set
-  if ((await redis.exists(kA)) === 0) {
-    if (approverIds.length) {
-      await redis.sAdd(kA, approverIds.map(String));
-    }
+  // approvers set：每次都用最新的数据库配置覆盖，确保新增/删除的 ID 实时生效
+  if (approverIds.length) {
+    await redis.del(kA);
+    await redis.sAdd(kA, approverIds.map(String));
+    await redis.expire(kA, ttlSec);
+  } else if ((await redis.exists(kA)) === 0) {
+    // 没有配置审批人时不创建空 set
   }
 
   // stage audit hash：不存在就创建；存在但字段不全就补齐
