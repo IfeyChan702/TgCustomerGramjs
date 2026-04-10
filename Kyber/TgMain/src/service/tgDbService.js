@@ -322,10 +322,16 @@ const insertOrderContext = async (channelMsgId, merchantMsgId, merchantChatId, c
  * 根据channelMsgId查询tg_order表的订单
  */
 const getOrderByChannelMsgId = async (channelMsgId, targetChatId) => {
+  // 兼容 -100 前缀：GramJS 传入 -1003551257408，数据库可能存的是 -3551257408
+  const s = String(targetChatId);
+  const variants = s.startsWith('-100')
+    ? [s, '-' + s.slice(4)]
+    : [s, '-100' + s.slice(1)];
+
   const sql = `SELECT t.*
                FROM tg_order t
-               WHERE channel_msg_id = ? AND target_chat_id = ?`;
-  const results = await queryAsync(sql, [channelMsgId, targetChatId]);
+               WHERE channel_msg_id = ? AND target_chat_id IN (?, ?)`;
+  const results = await queryAsync(sql, [channelMsgId, variants[0], variants[1]]);
   return results.length > 0 ? results[0] : null;
 };
 /**
@@ -347,8 +353,13 @@ const updateOrderStatusByChannelMsgId = async (channelMsgId, targetChatId, reply
     values.push(replyId);
   }
 
-  sql += ` WHERE channel_msg_id = ? AND target_chat_id = ?`;
-  values.push(channelMsgId, targetChatId);
+  // 兼容 -100 前缀两种格式
+  const s = String(targetChatId);
+  const variants = s.startsWith('-100')
+    ? [s, '-' + s.slice(4)]
+    : [s, '-100' + s.slice(1)];
+  sql += ` WHERE channel_msg_id = ? AND target_chat_id IN (?, ?)`;
+  values.push(channelMsgId, variants[0], variants[1]);
 
   try {
     const result = await queryAsync(sql, values);
