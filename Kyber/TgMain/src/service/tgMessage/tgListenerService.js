@@ -322,7 +322,7 @@ async function handleMerchantOrderMessage(client, chatId, message) {
   console.log(`[handleMerchantOrderMessage] sourceGroupIds:`, [...sourceGroupIds]);
   console.log(`[handleMerchantOrderMessage] relevantAccountIds:`, [...relevantAccountIds]);
 
-  if (!sourceGroupIds.has(String(chatId))) {
+  if (!setHasChatId(sourceGroupIds, chatId)) {
     console.warn(`[handleMerchantOrderMessage] ❌ 跳过：chatId(${chatId}) 不在商户群列表中`);
     return;
   }
@@ -434,7 +434,7 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
   try {
     const channelGroupIds = await tgDbService.getAllChatIdsInChannel();
     console.log(`[handleChannelReply] 渠道群列表:`, [...channelGroupIds]);
-    if (!channelGroupIds.has(String(chatId))) {
+    if (!setHasChatId(channelGroupIds, chatId)) {
       console.warn(`[handleChannelReply] ❌ 跳过：chatId(${chatId}) 不在渠道群列表中，消息未转发`);
       return;
     }
@@ -804,6 +804,26 @@ async function handleChatIdOrder(client, chatId, message, chatTitle, chat) {
       message: `系统错误，"/chatId"命令处理失败`
     });
   }
+}
+
+/**
+ * 兼容 Telegram 两种 chatId 格式：
+ *   GramJS MTProto: -1003551257408
+ *   Bot API / 旧存储: -3551257408
+ * 返回该 id 的所有可能格式，用于 Set.has() 双重匹配
+ */
+function chatIdVariants(id) {
+  const s = String(id);
+  if (s.startsWith('-100')) {
+    return [s, '-' + s.slice(4)];   // [-1003551257408, -3551257408]
+  } else if (s.startsWith('-')) {
+    return [s, '-100' + s.slice(1)]; // [-3551257408, -1003551257408]
+  }
+  return [s];
+}
+
+function setHasChatId(set, chatId) {
+  return chatIdVariants(chatId).some(v => set.has(v));
 }
 
 function getMsgTimestampMillis(message) {
