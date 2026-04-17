@@ -55,7 +55,12 @@ startOrderListener().catch(console.error);
 
 // ================= 监听事件主逻辑 ===================
 function setupEventHandlers(client, isRunning) {
+  const seenMsgKeys = new Set();
   client.addEventHandler(async (event) => {
+    const key = `${event.chatId}:${event.message?.id}`;
+    if (seenMsgKeys.has(key)) return;
+    seenMsgKeys.add(key);
+    setTimeout(() => seenMsgKeys.delete(key), 30000);
     try {
       await handleEvent(client, event, isRunning);
     } catch (e) {

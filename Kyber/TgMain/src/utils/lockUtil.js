@@ -5,11 +5,13 @@ async function getOrRunMessageResponse(redis,chatId,messageId,ttlSeconds=600,fn)
 
   const cached = await redis.get(resultKey);
   if (cached){
+    console.log(`[lockUtil] skip: result cached key=${resultKey}`);
     return false;
   }
 
   const lock = await redis.set(lockKey,"1","NX","EX",15);
   if (!lock){
+    console.log(`[lockUtil] skip: lock taken key=${lockKey}`);
     return false;
   }
 
