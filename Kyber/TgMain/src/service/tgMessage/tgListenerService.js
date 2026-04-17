@@ -58,6 +58,7 @@ function setupEventHandlers(client, isRunning) {
   const seenMsgKeys = new Set();
   client.addEventHandler(async (event) => {
     const key = `${event.chatId}:${event.message?.id}`;
+    console.log(`[setupEventHandlers] key=${key} seen=${seenMsgKeys.has(key)}`);
     if (seenMsgKeys.has(key)) return;
     seenMsgKeys.add(key);
     setTimeout(() => seenMsgKeys.delete(key), 30000);
@@ -256,9 +257,7 @@ async function handleEvent(client, event, isRunning) {
 
   if (hasPhoto && hasText && hasOrderNo) {
     console.log(`[handleEvent] → 进入分支3：图片订单转发`);
-    await getOrRunMessageResponse(redis, chatId, message.id, 60, async () => { // 60秒足够
-      await handleMerchantOrderMessage(client, chatId, message);
-    });
+    await handleMerchantOrderMessage(client, chatId, message);
     return;
   }
 
