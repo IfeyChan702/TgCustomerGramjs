@@ -485,6 +485,27 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
         console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
       } else {
         replyId = replyText.id;
+
+        // 发送前探测：商户那条「原始订单消息」是否还在
+        // 被删 → 不转发（避免发出无引用、看不懂的孤儿消息），且 status 保持未处理
+        // getMessages 调用失败 → 按「存在」处理，退回原行为（不漏真实通知）
+        let targetExists = true;
+        try {
+          const targetMsgs = await client.getMessages(BigInt(context.merchant_chat_id), {
+            ids: [Number(context.merchant_msg_id)]
+          });
+          const targetMsg = targetMsgs && targetMsgs[0];
+          targetExists = !!targetMsg && targetMsg.className !== "MessageEmpty";
+        } catch (e) {
+          console.warn(`[WARN] 检查原始消息是否存在失败，按存在处理: ${e.message}`);
+          targetExists = true;
+        }
+
+        if (!targetExists) {
+          console.log(`[INFO] 商户原始消息 ${context.merchant_msg_id}（群 ${context.merchant_chat_id}）已删除，跳过转发，status 保持未处理`);
+          return;
+        }
+
         console.log(`[DEBUG] 语料库匹配 replyId:${replyId}, 原文:"${replyContent}" → 回复:"${replyText.reply_text}", 目标群:${context.merchant_chat_id}, 目标消息:${context.merchant_msg_id}`);
         await client.sendMessage(BigInt(context.merchant_chat_id), {
           message: replyText.reply_text,
