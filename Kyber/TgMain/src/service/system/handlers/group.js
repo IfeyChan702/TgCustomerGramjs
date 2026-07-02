@@ -22,6 +22,16 @@ function registerGroupHandler(bot) {
     const text = ctx.message.text || "";
     const token = text.slice(cmdEnt.offset, cmdEnt.offset + cmdEnt.length);
     const from = ctx.from;
+
+    // 命令 @ 定向校验：/command@botname 指定给其它机器人时，本机器人忽略
+    const myUsername = ctx.botInfo?.username || ctx.me;
+    const atTarget = token.replace(/^\//, "").split("@")[1];
+    const isForOtherBot = !!(atTarget && myUsername && atTarget.toLowerCase() !== myUsername.toLowerCase());
+    if (isForOtherBot) {
+      console.log(`[Group] 命令 ${token} 定向给 @${atTarget}，非本机器人 @${myUsername}，忽略`);
+      return next?.();
+    }
+
     if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") {
       // 1) /getchatId1
       if (/^\/getchatId1(?:@\w+)?$/i.test(token)) {
@@ -135,6 +145,7 @@ function registerGroupHandler(bot) {
       const parts = text.trim().split(/\s+/);
 
       const rawCmdToken = token || parts[0] || "";
+      // @ 定向已在上方统一校验，这里只取命令名
       const identifier = rawCmdToken.replace(/^\//, "").split("@")[0].toLowerCase();
 
       const restText = text.slice(cmdEnt.offset + cmdEnt.length).trim();
