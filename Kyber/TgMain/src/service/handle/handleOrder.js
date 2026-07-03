@@ -73,11 +73,13 @@ async function getErsanToken(redis) {
         }
       } catch {}
     }
-    //https://api.pay.ersan.click/admin-api/system/auth/login测试环境
-    const loginUrl = "https://api.gamecloud.vip/admin-api/system/auth/login";
-    //const loginUrl = "https://api.pay.ersan.click/admin-api/system/auth/login";
-    const loginBody = { type: 0, username: "robot", password: "Apple_Rob@op*" };
-    //const loginBody = { type: 0, username: "robot", password: "robot132456" };
+    // 生产默认 gamecloud；测试环境用 .env 覆盖 PLT_LOGIN_URL/PLT_USER/PLT_PASS
+    const loginUrl = process.env.PLT_LOGIN_URL || "https://api.gamecloud.vip/admin-api/system/auth/login";
+    const loginBody = {
+      type: 0,
+      username: process.env.PLT_USER || "robot",
+      password: process.env.PLT_PASS || "Apple_Rob@op*"
+    };
 
     const resp = await axios.post(loginUrl, loginBody);
     console.log(`getErsanToken 中 respond 返回的code = ${resp.data.code}，data = ${resp.data}`)

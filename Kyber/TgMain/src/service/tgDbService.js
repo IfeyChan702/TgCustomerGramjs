@@ -550,8 +550,108 @@ const isGroupAllowedForCommand = async (commandId,groupId) => {
 }
 
 
+/**
+ * 插入一条"处理中"的查单工单（含 UTR 查单相关字段）
+ * @param p { channelMsgId, merchantMsgId, merchantChatId, channelGroupId, merchantOrderId,
+ *            targetChatId, platformOrderNo, amount, orderCreatedTime, statusCode }
+ * @returns {Promise<number>} 新插入行 id
+ */
+const insertQueryTicket = async (p) => {
+  const sql = `
+      INSERT INTO tg_order (channel_msg_id,
+                            merchant_msg_id,
+                            merchant_chat_id,
+                            channel_group_id,
+                            status,
+                            created_time,
+                            merchant_order_id,
+                            target_chat_id,
+                            platform_order_no,
+                            amount,
+                            order_created_time,
+                            status_code,
+                            query_result,
+                            ticket_status)
+      VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, '处理中', 0)
+  `;
+  const values = [
+    p.channelMsgId,
+    p.merchantMsgId,
+    p.merchantChatId,
+    p.channelGroupId,
+    p.merchantOrderId,
+    p.targetChatId,
+    p.platformOrderNo || null,
+    p.amount != null ? p.amount : null,
+    p.orderCreatedTime || null,
+    p.statusCode != null ? p.statusCode : null,
+  ];
+  const result = await queryAsync(sql, values);
+  return result.insertId;
+};
+
+/**
+ * 结束工单（查单成功/查单失败终态），同时同步 legacy status=1
+ */
+const finishTicket = async (id, { queryResult, statusCode, utr, matchedOrderNo }) => {
+  const sql = `
+      UPDATE tg_order
+      SET status           = 1,
+          ticket_status    = 1,
+          next_retry_time  = NULL,
+          query_result     = ?,
+          status_code      = ?,
+          utr              = ?,
+          matched_order_no = ?
+      WHERE id = ?
+  `;
+  const values = [queryResult, statusCode != null ? statusCode : null, utr || null, matchedOrderNo || null, id];
+  const result = await queryAsync(sql, values);
+  return result.affectedRows;
+};
+
+/**
+ * 安排下一次自动重查（+1小时），并累加重查次数
+ */
+const scheduleNextRetry = async (id) => {
+  const sql = `
+      UPDATE tg_order
+      SET next_retry_time = DATE_ADD(NOW(), INTERVAL 1 HOUR),
+          retry_count     = retry_count + 1
+      WHERE id = ?
+  `;
+  const result = await queryAsync(sql, [id]);
+  return result.affectedRows;
+};
+
+/**
+ * 取所有到期需要自动重查的处理中工单
+ */
+const getDueRetryTickets = async () => {
+  const sql = `
+      SELECT id,
+             merchant_chat_id,
+             merchant_msg_id,
+             merchant_order_id,
+             platform_order_no,
+             order_created_time,
+             retry_count
+      FROM tg_order
+      WHERE ticket_status = 0
+        AND next_retry_time IS NOT NULL
+        AND next_retry_time <= NOW()
+      ORDER BY next_retry_time ASC
+      LIMIT 50
+  `;
+  return await queryAsync(sql);
+};
+
 // 统一导出
 module.exports = {
+  insertQueryTicket,
+  finishTicket,
+  scheduleNextRetry,
+  getDueRetryTickets,
   getAccountIdsByChatIdInMerchant,
   getAccountIdByTelegramId,
   getAllAccountIdsInMerchant,

@@ -3,7 +3,6 @@ const router = express.Router();
 const tgComGroPeService = require("../../service/command/tgComGroPeService");
 const { success, fail } = require("../../utils/responseWrapper");
 const { finalize } = require("swagger-jsdoc/src/specification");
-const { ConfigSet } = require("ts-jest");
 
 /**
  * 模糊查询，分页查询，条件查询permission

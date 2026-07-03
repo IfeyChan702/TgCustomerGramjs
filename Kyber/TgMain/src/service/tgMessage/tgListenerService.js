@@ -8,13 +8,14 @@ const { redis } = require("../../models/redisModel");
 const handleOrder = require("../handle/handleOrder");
 const handleRate = require("../handle/handleRate");
 const handleSuccess = require("../handle/handleSuccess");
+const orderQuery = require("../handle/orderQueryService");
 const tgMsgHandle = require("../tgMessage/tgMsgHandService");
 
 const clients = [];
 const ErrorGroupChatID = -4750453063;
 const orderChatId = -4856325360;//线上的命令群
 const MAX_THREAD_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const orderRegex = /\b[\dA-Za-z]{10,30}\b/;
+const orderRegex = /[A-Za-z0-9_-]{10,30}/;
 // 允许使用 success 命令的群
 const ALLOWED_SUCCESS_CHAT_IDS = new Set([
   "-4750453063",
@@ -342,94 +343,62 @@ async function handleMerchantOrderMessage(client, chatId, message) {
     return;
   }
 
-  await client.sendMessage(chatId, {
-    message: "请稍等，现在为您查询订单",
-    replyTo: message.id
-  });
-
   const orderId = message.message.match(orderRegex)?.[0];
-  console.log(`[INFO] 检测到订单号: ${orderId}，请求接口中...`);
+  console.log(`[INFO] 检测到订单号: ${orderId}，开始查单...`);
+
+  // —— 查单：order-in/get 获取订单详情（含 UTR/金额/创建时间/状态）——
+  const detail = await orderQuery.queryOrderDetail(orderId);
+  if (!detail) {
+    console.warn(`[handleMerchantOrderMessage] 查单失败(接口无数据)，订单:${orderId}，仅记录日志，不通知商户`);
+    return;
+  }
+
+  // 成功短路：已收款成功 → 直接回“查单成功”卡片，不转发渠道
+  if (orderQuery.isSuccess(detail.status)) {
+    const card = orderQuery.buildResultCard({ detail, submittedOrderNo: orderId, success: true, note: "已补单成功" });
+    await client.sendMessage(chatId, { message: card, replyTo: message.id });
+    console.log(`[INFO] 订单 ${orderId} 已成功(status=${detail.status})，直接回复商户，不转发渠道`);
+    return;
+  }
+
+  // 规则4.1：未支付 且 >48h（或终态失败）→ 查单那一刻直接判“查单失败”，说明取接口状态，不转渠道
+  if (orderQuery.isTerminalFail(detail.status) || isOver48h(detail.createTime)) {
+    const card = orderQuery.buildResultCard({
+      detail, submittedOrderNo: orderId, success: false,
+      note: detail.statusDesc ? String(detail.statusDesc) : "未匹配到UTR"
+    });
+    await client.sendMessage(chatId, { message: card, replyTo: message.id });
+    console.log(`[INFO] 订单 ${orderId} 未支付且>48h/终态，直接判查单失败，不转发渠道`);
+    return;
+  }
+
+  // 未成功且≤48h：先回“处理中”卡片，再把 平台单号+图片 转发渠道并建工单
+  const queryingCard = orderQuery.buildQueryingCard(detail, orderId);
+  await client.sendMessage(chatId, { message: queryingCard, replyTo: message.id });
+
   try {
-
-    let response;
-    let source = "bi";
-
-    try {
-
-      response = await axios.get("https://bi.sompay.xyz/bi/payin/check", {
-        params: { order_id: orderId },
-        timeout: 5000
-      });
-
-      if (!response.data || !response.data.channel_id) {
-        throw new Error("第一个接口数据无效");
-      }
-
-    } catch (err) {
-      console.warn(`[WARN] 第一个接口失败:${err.message}，尝试备用接口...`);
-      source = "gameCloud";
-
-      const token = await handleOrder.getErsanToken(redis);
-
-      if (!token) {
-        console.warn("没有可用的 token，无法请求接口");
-        return;
-      }
-      console.log(`handleMerchantOrderMessage,调用登录接口的token=${token}`);
-      response = await axios.get(
-        `https://api.gamecloud.vip/admin-api/plt/order-in/get/${orderId}`,
-        {
-          headers: {
-            "tenant-id": "1",
-            Authorization: `Bearer ${token}`
-          },
-          timeout: 8000
-        }
-      );
-    }
-
-    const raw = response.data || {};
-    const data = raw.data || raw;
-    if (data.data === null) {
-      console.error(`data=null,response=${response}`);
-      return;
-    }
-    const channelId = data.channel_id || data.channelId || "未获得到渠道ID";
-    const channelName = data.channel_name || data.channelName || "未知渠道";
-    const merchantOrderId = data.merchantOrderId || data.merchantOrderNo || "未知商户订单号";
-    const orderNo = data.orderId || data.orderNo || "未知平台订单号";
-    const channelOrderNo = data.channel_order_id || data.channelOrderNo || "未知渠道订单号";
-    const status = data.payResult || data.statusDesc || "未知状态";
-
+    const channelId = detail.channelId;
+    const orderNo = detail.orderNo || orderId;
     const targetChatIds = await tgDbService.getChatIdsByChannelIdInChannel(String(channelId));
 
     if (!targetChatIds.length) {
       await client.sendMessage(orderChatId, { message: `[WARN] 未找到 channelId=${channelId} 对应的群` });
-      const errorSentMsg = await client.sendFile(orderChatId, {
-        file: message.media,
-        caption: `${orderNo}`
-      });
-      await addOrUpdateOrder(errorSentMsg.id, message.id, chatId, channelId, orderNo, orderChatId);
+      const errorSentMsg = await client.sendFile(orderChatId, { file: message.media, caption: `${orderNo}` });
+      await addOrUpdateQueryTicket(errorSentMsg.id, message.id, chatId, channelId, orderId, orderChatId, detail);
       return;
     }
-    // 群发图片
     for (const targetChatId of targetChatIds) {
       try {
-        const sentMsg = await client.sendFile(targetChatId, {
-          file: message.media,
-          caption: `${orderNo}`
-        });
-
-        await addOrUpdateOrder(sentMsg.id, message.id, chatId, channelId, orderNo, targetChatId);
-
+        const sentMsg = await client.sendFile(targetChatId, { file: message.media, caption: `${orderNo}` });
+        await addOrUpdateQueryTicket(sentMsg.id, message.id, chatId, channelId, orderId, targetChatId, detail);
         console.log(`Sent to ${targetChatId}:`, sentMsg.id);
       } catch (err) {
         console.error(`Failed to send to ${targetChatId}:`, err.message);
       }
     }
-    console.log(`[INFO] 渠道单号已发送至目标群`);
+    console.log(`[INFO] 平台单号已转发至渠道群`);
   } catch (err) {
-    console.error(`[ERROR] 请求接口失败:`, err.message);
+    console.error(`[ERROR] 转发渠道失败:`, err.message);
   }
 }
 
@@ -476,44 +445,59 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
       const replyContent = (message.message || "").trim();
       if (!replyContent) return;
       const replyText = await tgDbService.getReplyText(replyContent);
-      let replyId = null;
 
+      // 语料库匹配规则同旧逻辑：渠道回复"包含"配置的关键词(match_rule)才算命中；没命中就不回复
       if (replyText === null) {
         await client.sendMessage(orderChatId, {
           message: `语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`
         });
         console.log(`语料库不存在 ${replyContent}, 群 ID :${chatId}, 群名称 :${chatTitle}`);
-      } else {
-        replyId = replyText.id;
-
-        // 发送前探测：商户那条「原始订单消息」是否还在
-        // 被删 → 不转发（避免发出无引用、看不懂的孤儿消息），且 status 保持未处理
-        // getMessages 调用失败 → 按「存在」处理，退回原行为（不漏真实通知）
-        let targetExists = true;
-        try {
-          const targetMsgs = await client.getMessages(BigInt(context.merchant_chat_id), {
-            ids: [Number(context.merchant_msg_id)]
-          });
-          const targetMsg = targetMsgs && targetMsgs[0];
-          targetExists = !!targetMsg && targetMsg.className !== "MessageEmpty";
-        } catch (e) {
-          console.warn(`[WARN] 检查原始消息是否存在失败，按存在处理: ${e.message}`);
-          targetExists = true;
-        }
-
-        if (!targetExists) {
-          console.log(`[INFO] 商户原始消息 ${context.merchant_msg_id}（群 ${context.merchant_chat_id}）已删除，跳过转发，status 保持未处理`);
-          return;
-        }
-
-        console.log(`[DEBUG] 语料库匹配 replyId:${replyId}, 原文:"${replyContent}" → 回复:"${replyText.reply_text}", 目标群:${context.merchant_chat_id}, 目标消息:${context.merchant_msg_id}`);
-        await client.sendMessage(BigInt(context.merchant_chat_id), {
-          message: replyText.reply_text,
-          replyTo: Number(context.merchant_msg_id)
-        });
-        console.log(`[INFO] 回复已转发回原群 ${context.merchant_chat_id} 并引用消息 ${context.merchant_msg_id}`);
-        await tgDbService.updateOrderStatusByChannelMsgId(replyToId, chatId, replyId);
+        return;
       }
+      const note = replyText.reply_text;
+      const replyId = replyText.id;
+
+      // 发送前探测：商户那条「原始订单消息」是否还在，被删则跳过（避免发孤儿消息）
+      let targetExists = true;
+      try {
+        const targetMsgs = await client.getMessages(BigInt(context.merchant_chat_id), {
+          ids: [Number(context.merchant_msg_id)]
+        });
+        const targetMsg = targetMsgs && targetMsgs[0];
+        targetExists = !!targetMsg && targetMsg.className !== "MessageEmpty";
+      } catch (e) {
+        console.warn(`[WARN] 检查原始消息是否存在失败，按存在处理: ${e.message}`);
+        targetExists = true;
+      }
+      if (!targetExists) {
+        console.log(`[INFO] 商户原始消息 ${context.merchant_msg_id}（群 ${context.merchant_chat_id}）已删除，跳过转发`);
+        return;
+      }
+
+      // 渠道已回复 → 直接把结果返回给商户并结单（结果依据语料库话术；卡片字段取接口，取不到用工单存的）
+      const submittedOrderNo = context.merchant_order_id;
+      const queryNo = context.platform_order_no || submittedOrderNo;
+      const detail = await orderQuery.queryOrderDetail(queryNo);
+      const detailForCard = detail || {
+        orderNo: context.platform_order_no,
+        merchantOrderNo: submittedOrderNo,
+        utr: context.utr,
+        amount: context.amount,
+        createTime: context.order_created_time,
+        status: context.status_code
+      };
+      const success = /成功/.test(note) && !/失败/.test(note);
+      const card = orderQuery.buildResultCard({ detail: detailForCard, submittedOrderNo, success, note });
+      await client.sendMessage(BigInt(context.merchant_chat_id), {
+        message: card,
+        replyTo: Number(context.merchant_msg_id)
+      });
+      await tgDbService.finishTicket(context.id, {
+        queryResult: success ? "查单成功" : "查单失败",
+        statusCode: detailForCard.status, utr: detailForCard.utr, matchedOrderNo: detailForCard.merchantOrderNo
+      });
+      await tgDbService.updateOrderStatusByChannelMsgId(replyToId, chatId, replyId);
+      console.log(`[INFO] 工单 ${context.id} 渠道已回复，结果=${success ? "查单成功" : "查单失败"}，已回复商户`);
     } else {
       console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
     }
@@ -591,6 +575,114 @@ async function addOrUpdateOrder(channelMessageId, merchantMessageId, chatId, cha
     console.error(" 插入 tg_order 失敗:", err.message);
   }
 }
+
+// ============ UTR 查单：建工单 / 时间判断 / 定时重查 ============
+
+// 建一条"处理中"查单工单（转发渠道后调用）
+async function addOrUpdateQueryTicket(channelMsgId, merchantMsgId, merchantChatId, channelId, submittedOrderNo, targetChatId, detail) {
+  try {
+    await tgDbService.insertQueryTicket({
+      channelMsgId,
+      merchantMsgId,
+      merchantChatId,
+      channelGroupId: channelId,
+      merchantOrderId: submittedOrderNo,
+      targetChatId,
+      platformOrderNo: detail.orderNo,
+      amount: detail.amount,
+      orderCreatedTime: orderQuery.fmtTime(detail.createTime),
+      statusCode: detail.status
+    });
+    console.log(`[INFO] 查单工单已建，商户群:${merchantChatId} 订单:${submittedOrderNo} channelMsg:${channelMsgId}`);
+  } catch (err) {
+    console.error("插入查单工单失败:", err.message);
+  }
+}
+
+// 订单创建时间距今是否超过 48 小时（兼容数字时间戳/日期字符串）
+function isOver48h(createTime) {
+  if (!createTime) return false;
+  const t = orderQuery.toEpochMs(createTime);
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t > 48 * 60 * 60 * 1000;
+}
+
+// 找到能给该商户群发消息的 client（按商户群绑定的账号定位，兜底取第一个）
+async function findClientForMerchant(merchantChatId) {
+  try {
+    const accIds = await tgDbService.getAccountIdsByChatIdInMerchant(merchantChatId);
+    for (const entry of clients) {
+      if (accIds.has(entry.id) || accIds.has(String(entry.id)) || accIds.has(Number(entry.id))) {
+        return entry.client;
+      }
+    }
+  } catch (e) {
+    console.error("findClientForMerchant:", e.message);
+  }
+  return clients[0]?.client || null;
+}
+
+const RETRY_SCAN_INTERVAL_MS = 5 * 60 * 1000; // 每 5 分钟扫描到期工单
+
+// 定时重查：未支付且≤48h 的工单每小时自动重查一次（变成功→成功结单；超48h→失败结单）
+async function processRetryTickets() {
+  let due;
+  try {
+    due = await tgDbService.getDueRetryTickets();
+  } catch (e) {
+    console.error("[retry] 查询到期工单失败:", e.message);
+    return;
+  }
+  if (!due || !due.length) return;
+  console.log(`[retry] 到期待重查工单 ${due.length} 条`);
+
+  for (const t of due) {
+    try {
+      const queryNo = t.platform_order_no || t.merchant_order_id;
+      const detail = await orderQuery.queryOrderDetail(queryNo);
+      if (!detail) {
+        await tgDbService.scheduleNextRetry(t.id);
+        continue;
+      }
+      const client = await findClientForMerchant(t.merchant_chat_id);
+      if (!client) {
+        await tgDbService.scheduleNextRetry(t.id);
+        continue;
+      }
+      const submittedOrderNo = t.merchant_order_id;
+      if (orderQuery.isSuccess(detail.status)) {
+        const card = orderQuery.buildResultCard({ detail, submittedOrderNo, success: true, note: "已补单成功" });
+        await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
+        await tgDbService.finishTicket(t.id, {
+          queryResult: "查单成功", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
+        });
+        console.log(`[retry] 工单 ${t.id} 已成功，回复商户并结单`);
+      } else if (orderQuery.isTerminalFail(detail.status) || isOver48h(detail.createTime)) {
+        const card = orderQuery.buildResultCard({
+          detail, submittedOrderNo, success: false,
+          note: detail.statusDesc ? String(detail.statusDesc) : "超时未支付"
+        });
+        await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
+        await tgDbService.finishTicket(t.id, {
+          queryResult: "查单失败", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
+        });
+        console.log(`[retry] 工单 ${t.id} 超48h/终态失败，回复商户并结单`);
+      } else {
+        await tgDbService.scheduleNextRetry(t.id);
+        console.log(`[retry] 工单 ${t.id} 仍未支付，顺延 1 小时`);
+      }
+    } catch (err) {
+      console.error(`[retry] 处理工单 ${t.id} 失败:`, err.message);
+      try {
+        await tgDbService.scheduleNextRetry(t.id);
+      } catch (_) {}
+    }
+  }
+}
+
+setInterval(() => {
+  processRetryTickets().catch(console.error);
+}, RETRY_SCAN_INTERVAL_MS);
 
 /**
  * 处理订单状态为0，并转发

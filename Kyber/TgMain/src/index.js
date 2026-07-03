@@ -3,7 +3,8 @@ const dotenv = require("dotenv");
 
 const express = require("express");
 
-const env = "production";
+// 默认生产；`npm run dev`(cross-env NODE_ENV=development) 会加载 .env.development
+const env = process.env.NODE_ENV || "production";
 const envPath = path.resolve(__dirname, `../.env.${env}`);
 dotenv.config({ path: envPath });
 
