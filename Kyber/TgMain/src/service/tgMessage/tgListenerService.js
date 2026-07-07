@@ -361,18 +361,8 @@ async function handleMerchantOrderMessage(client, chatId, message) {
     return;
   }
 
-  // 规则4.1：未支付 且 >48h（或终态失败）→ 查单那一刻直接判“查单失败”，说明取接口状态，不转渠道
-  if (orderQuery.isTerminalFail(detail.status) || isOver48h(detail.createTime)) {
-    const card = orderQuery.buildResultCard({
-      detail, submittedOrderNo: orderId, success: false,
-      note: detail.statusDesc ? String(detail.statusDesc) : "未匹配到UTR"
-    });
-    await client.sendMessage(chatId, { message: card, replyTo: message.id });
-    console.log(`[INFO] 订单 ${orderId} 未支付且>48h/终态，直接判查单失败，不转发渠道`);
-    return;
-  }
-
-  // 未成功且≤48h：先回“处理中”卡片，再把 平台单号+图片 转发渠道并建工单
+  // 非成功（含未支付/待收款/失败/取消）：一律先回“处理中”卡片，再把 平台单号+图片 转发渠道核实
+  // 注意：不再凭平台接口状态自动判“查单失败”，失败与否由渠道（真实收款方）回复决定，避免漏单
   const queryingCard = orderQuery.buildQueryingCard(detail, orderId);
   await client.sendMessage(chatId, { message: queryingCard, replyTo: message.id });
 
@@ -599,90 +589,9 @@ async function addOrUpdateQueryTicket(channelMsgId, merchantMsgId, merchantChatI
   }
 }
 
-// 订单创建时间距今是否超过 48 小时（兼容数字时间戳/日期字符串）
-function isOver48h(createTime) {
-  if (!createTime) return false;
-  const t = orderQuery.toEpochMs(createTime);
-  if (!Number.isFinite(t)) return false;
-  return Date.now() - t > 48 * 60 * 60 * 1000;
-}
-
-// 找到能给该商户群发消息的 client（按商户群绑定的账号定位，兜底取第一个）
-async function findClientForMerchant(merchantChatId) {
-  try {
-    const accIds = await tgDbService.getAccountIdsByChatIdInMerchant(merchantChatId);
-    for (const entry of clients) {
-      if (accIds.has(entry.id) || accIds.has(String(entry.id)) || accIds.has(Number(entry.id))) {
-        return entry.client;
-      }
-    }
-  } catch (e) {
-    console.error("findClientForMerchant:", e.message);
-  }
-  return clients[0]?.client || null;
-}
-
-const RETRY_SCAN_INTERVAL_MS = 5 * 60 * 1000; // 每 5 分钟扫描到期工单
-
-// 定时重查：未支付且≤48h 的工单每小时自动重查一次（变成功→成功结单；超48h→失败结单）
-async function processRetryTickets() {
-  let due;
-  try {
-    due = await tgDbService.getDueRetryTickets();
-  } catch (e) {
-    console.error("[retry] 查询到期工单失败:", e.message);
-    return;
-  }
-  if (!due || !due.length) return;
-  console.log(`[retry] 到期待重查工单 ${due.length} 条`);
-
-  for (const t of due) {
-    try {
-      const queryNo = t.platform_order_no || t.merchant_order_id;
-      const detail = await orderQuery.queryOrderDetail(queryNo);
-      if (!detail) {
-        await tgDbService.scheduleNextRetry(t.id);
-        continue;
-      }
-      const client = await findClientForMerchant(t.merchant_chat_id);
-      if (!client) {
-        await tgDbService.scheduleNextRetry(t.id);
-        continue;
-      }
-      const submittedOrderNo = t.merchant_order_id;
-      if (orderQuery.isSuccess(detail.status)) {
-        const card = orderQuery.buildResultCard({ detail, submittedOrderNo, success: true, note: "已补单成功" });
-        await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
-        await tgDbService.finishTicket(t.id, {
-          queryResult: "查单成功", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
-        });
-        console.log(`[retry] 工单 ${t.id} 已成功，回复商户并结单`);
-      } else if (orderQuery.isTerminalFail(detail.status) || isOver48h(detail.createTime)) {
-        const card = orderQuery.buildResultCard({
-          detail, submittedOrderNo, success: false,
-          note: detail.statusDesc ? String(detail.statusDesc) : "超时未支付"
-        });
-        await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
-        await tgDbService.finishTicket(t.id, {
-          queryResult: "查单失败", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
-        });
-        console.log(`[retry] 工单 ${t.id} 超48h/终态失败，回复商户并结单`);
-      } else {
-        await tgDbService.scheduleNextRetry(t.id);
-        console.log(`[retry] 工单 ${t.id} 仍未支付，顺延 1 小时`);
-      }
-    } catch (err) {
-      console.error(`[retry] 处理工单 ${t.id} 失败:`, err.message);
-      try {
-        await tgDbService.scheduleNextRetry(t.id);
-      } catch (_) {}
-    }
-  }
-}
-
-setInterval(() => {
-  processRetryTickets().catch(console.error);
-}, RETRY_SCAN_INTERVAL_MS);
+// 【已移除】48h 自动判失败 + 定时重查(processRetryTickets/isOver48h/findClientForMerchant)。
+// 原因：平台接口的“失败/超时”状态可能滞后于渠道真实收款情况，凭它自动判失败会漏单。
+// 现改为：成功→直接回商户；其它一律转渠道，由渠道回复决定结单（见 handleChannelReply）。
 
 /**
  * 处理订单状态为0，并转发
