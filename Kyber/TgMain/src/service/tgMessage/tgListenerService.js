@@ -375,8 +375,16 @@ async function handleMerchantOrderMessage(client, chatId, message) {
     return;
   }
 
-  // 非成功（含未支付/待收款/失败/取消）：一律先回“处理中”卡片，再把 平台单号+图片 转发渠道核实
-  // 注意：不再凭平台接口状态自动判“查单失败”，失败与否由渠道（真实收款方）回复决定，避免漏单
+  // 订单创建已满48h且平台非成功：48h窗口已过 → 查单当刻直接回“查单失败”，不转渠道
+  if (isOver48hByCreated(detail.createTime)) {
+    const card = orderQuery.buildResultCard({ detail, submittedOrderNo: orderId, success: false, note: failNote(detail) });
+    await client.sendMessage(chatId, { message: card, replyTo: message.id });
+    console.log(`[INFO] 订单 ${orderId} 创建已满48h且平台非成功(status=${detail.status})，直接回查单失败，不转渠道`);
+    return;
+  }
+
+  // 未成功且 <48h：一律先回“处理中”卡片，再把 平台单号+图片 转发渠道核实
+  // 注意：<48h 不凭平台状态判失败，失败与否由渠道确认或每小时重查(满48h)决定，避免漏单
   const queryingCard = orderQuery.buildQueryingCard(detail, orderId);
   await client.sendMessage(chatId, { message: queryingCard, replyTo: message.id });
 
