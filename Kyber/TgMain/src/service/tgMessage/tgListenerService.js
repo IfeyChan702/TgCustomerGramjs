@@ -129,6 +129,20 @@ async function handleEvent(client, event, isRunning) {
         });
         return;
       }
+      if (message.message === "/矛盾") {
+        console.log(`[handleEvent] → 命令：/矛盾`);
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleConflictList(client, chatId, message);
+        });
+        return;
+      }
+      if (/^\/矛盾处理[：:]/.test(message.message)) {
+        console.log(`[handleEvent] → 命令：/矛盾处理`);
+        await getOrRunMessageResponse(redis, chatId, message.id, 60 * 10, async () => {
+          await handleConflictResolve(client, chatId, message);
+        });
+        return;
+      }
     }
 
     if (message.message === "/hello_chatId") {
@@ -432,6 +446,11 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
     console.log(`[DEBUG] 查询上下文 replyToId:${replyToId}, context:${JSON.stringify(context)}`);
 
     if (context && context.merchant_msg_id && context.merchant_chat_id) {
+      // 工单已结单(1已完成/2待人工) → 不重复处理，避免给商户重复发卡片
+      if (context.ticket_status != null && Number(context.ticket_status) !== 0) {
+        console.log(`[INFO] 工单 ${context.id} 已结单(ticket_status=${context.ticket_status})，忽略本次渠道回复`);
+        return;
+      }
       const replyContent = (message.message || "").trim();
       if (!replyContent) return;
       const replyText = await tgDbService.getReplyText(replyContent);
@@ -447,47 +466,46 @@ async function handleChannelReply(client, chatId, chatTitle, message) {
       const note = replyText.reply_text;
       const replyId = replyText.id;
 
-      // 发送前探测：商户那条「原始订单消息」是否还在，被删则跳过（避免发孤儿消息）
-      let targetExists = true;
-      try {
-        const targetMsgs = await client.getMessages(BigInt(context.merchant_chat_id), {
-          ids: [Number(context.merchant_msg_id)]
-        });
-        const targetMsg = targetMsgs && targetMsgs[0];
-        targetExists = !!targetMsg && targetMsg.className !== "MessageEmpty";
-      } catch (e) {
-        console.warn(`[WARN] 检查原始消息是否存在失败，按存在处理: ${e.message}`);
-        targetExists = true;
-      }
-      if (!targetExists) {
-        console.log(`[INFO] 商户原始消息 ${context.merchant_msg_id}（群 ${context.merchant_chat_id}）已删除，跳过转发`);
+      const isSuccessNote = /成功/.test(note) && !/失败/.test(note);
+
+      // Q2：渠道回复「非成功」话术 → 不转发、不改状态，交给每小时平台重查决定
+      if (!isSuccessNote) {
+        console.log(`[INFO] 工单 ${context.id} 渠道回复为非成功话术("${note}")，按规则忽略，等平台重查`);
         return;
       }
 
-      // 渠道已回复 → 直接把结果返回给商户并结单（结果依据语料库话术；卡片字段取接口，取不到用工单存的）
+      // 命中「成功」语料是子串匹配（"不成功" 也会命中 "成功" 规则）→ 必须再查一次平台二次确认，防误报成功
       const submittedOrderNo = context.merchant_order_id;
       const queryNo = context.platform_order_no || submittedOrderNo;
       const detail = await orderQuery.queryOrderDetail(queryNo);
-      const detailForCard = detail || {
-        orderNo: context.platform_order_no,
-        merchantOrderNo: submittedOrderNo,
-        utr: context.utr,
-        amount: context.amount,
-        createTime: context.order_created_time,
-        status: context.status_code
-      };
-      const success = /成功/.test(note) && !/失败/.test(note);
-      const card = orderQuery.buildResultCard({ detail: detailForCard, submittedOrderNo, success, note });
-      await client.sendMessage(BigInt(context.merchant_chat_id), {
-        message: card,
-        replyTo: Number(context.merchant_msg_id)
-      });
-      await tgDbService.finishTicket(context.id, {
-        queryResult: success ? "查单成功" : "查单失败",
-        statusCode: detailForCard.status, utr: detailForCard.utr, matchedOrderNo: detailForCard.merchantOrderNo
-      });
-      await tgDbService.updateOrderStatusByChannelMsgId(replyToId, chatId, replyId);
-      console.log(`[INFO] 工单 ${context.id} 渠道已回复，结果=${success ? "查单成功" : "查单失败"}，已回复商户`);
+
+      if (detail && orderQuery.isSuccess(detail.status)) {
+        // ✅ 渠道 + 平台 双确认成功 → 回商户（文案用语料），结单
+        if (await merchantMsgExists(client, context.merchant_chat_id, context.merchant_msg_id)) {
+          const card = orderQuery.buildResultCard({ detail, submittedOrderNo, success: true, note });
+          await client.sendMessage(BigInt(context.merchant_chat_id), {
+            message: card, replyTo: Number(context.merchant_msg_id)
+          });
+        } else {
+          console.log(`[INFO] 工单 ${context.id} 平台已确认成功，但商户原始消息已删，跳过通知，仅结单`);
+        }
+        await tgDbService.finishTicket(context.id, {
+          queryResult: "查单成功", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
+        });
+        await tgDbService.updateOrderStatusByChannelMsgId(replyToId, chatId, replyId);
+        console.log(`[INFO] 工单 ${context.id} 渠道+平台双确认成功，已回复商户并结单`);
+      } else {
+        // ⚠️ 渠道说成功但平台不认（失败/未处理）
+        const st = detail ? detail.status : context.status_code;
+        if (isOver48hByCreated(context.order_created_time)) {
+          await sendConflictAlert(client, context, detail);        // ≥48h → 报警监听群
+          await tgDbService.escalateTicket(context.id);            //        + 转人工
+          console.log(`[INFO] 工单 ${context.id} 渠道说成功但平台(status=${st})不认且≥48h，已报警监听群并转人工`);
+        } else {
+          await tgDbService.markChannelClaimedSuccess(context.id); // <48h → 标记矛盾，等平台重查
+          console.log(`[INFO] 工单 ${context.id} 渠道说成功但平台(status=${st})暂不认(<48h)，已标记待平台确认`);
+        }
+      }
     } else {
       console.warn(`[WARN] 未找到关联上下文，replyToMsgId: ${replyToId}`);
     }
@@ -589,9 +607,159 @@ async function addOrUpdateQueryTicket(channelMsgId, merchantMsgId, merchantChatI
   }
 }
 
-// 【已移除】48h 自动判失败 + 定时重查(processRetryTickets/isOver48h/findClientForMerchant)。
-// 原因：平台接口的“失败/超时”状态可能滞后于渠道真实收款情况，凭它自动判失败会漏单。
-// 现改为：成功→直接回商户；其它一律转渠道，由渠道回复决定结单（见 handleChannelReply）。
+// ============ UTR 查单：辅助函数 + 每小时定时重查 ============
+
+// 订单创建时间距今是否 ≥48 小时（兼容 Date 对象 / 数字时间戳 / 日期字符串）
+function isOver48hByCreated(orderCreatedTime) {
+  if (!orderCreatedTime) return false;
+  let ms;
+  if (orderCreatedTime instanceof Date) ms = orderCreatedTime.getTime();
+  else ms = orderQuery.toEpochMs(orderCreatedTime);
+  if (!Number.isFinite(ms)) return false;
+  return Date.now() - ms >= 48 * 60 * 60 * 1000;
+}
+
+// 查单失败/矛盾时的“状态说明”：优先平台 statusDesc，取不到写兜底
+function failNote(detail) {
+  return detail && detail.statusDesc ? String(detail.statusDesc) : "订单异常，请人工处理";
+}
+
+// 探测商户那条「原始订单消息」是否还在（被删则不发孤儿消息）；查询失败按存在处理
+async function merchantMsgExists(client, merchantChatId, merchantMsgId) {
+  try {
+    const msgs = await client.getMessages(BigInt(merchantChatId), { ids: [Number(merchantMsgId)] });
+    const m = msgs && msgs[0];
+    return !!m && m.className !== "MessageEmpty";
+  } catch (e) {
+    console.warn(`[WARN] 检查原始消息是否存在失败，按存在处理: ${e.message}`);
+    return true;
+  }
+}
+
+// 找到能给该商户群发消息的 client（按商户群绑定账号定位，兜底取第一个）
+async function findClientForMerchant(merchantChatId) {
+  try {
+    const accIds = await tgDbService.getAccountIdsByChatIdInMerchant(merchantChatId);
+    for (const entry of clients) {
+      if (accIds.has(entry.id) || accIds.has(String(entry.id)) || accIds.has(Number(entry.id))) {
+        return entry.client;
+      }
+    }
+  } catch (e) {
+    console.error("findClientForMerchant:", e.message);
+  }
+  return clients[0] ? clients[0].client : null;
+}
+
+// 发「查单矛盾」到 Tg监听功能群（orderChatId），转人工
+async function sendConflictAlert(client, ctx, detail) {
+  const st = failNote(detail);
+  const platformNo = ctx.platform_order_no || (detail && detail.orderNo) || "";
+  const msg = `⚠️查单矛盾（请人工处理）｜订单:${ctx.merchant_order_id}｜平台单号:${platformNo}｜渠道判成功但平台判${st},已超48h,请人工核实｜商户群:${ctx.merchant_chat_id}`;
+  try {
+    await (client || (clients[0] && clients[0].client)).sendMessage(orderChatId, { message: msg });
+  } catch (e) {
+    console.error("sendConflictAlert 发送失败:", e.message);
+  }
+}
+
+// 每小时定时重查：只扫真正在途的 UTR 工单（query_result='处理中'），逐条查平台
+async function processOpenTickets() {
+  let tickets;
+  try {
+    tickets = await tgDbService.getOpenUtrTickets();
+  } catch (e) {
+    console.error("[hourly] 取在途工单失败:", e.message);
+    return;
+  }
+  if (!tickets || !tickets.length) return;
+  console.log(`[hourly] 在途 UTR 工单 ${tickets.length} 条，开始平台重查`);
+
+  for (const t of tickets) {
+    try {
+      const submittedOrderNo = t.merchant_order_id;
+      const queryNo = t.platform_order_no || submittedOrderNo;
+      const detail = await orderQuery.queryOrderDetail(queryNo);
+      const client = await findClientForMerchant(t.merchant_chat_id);
+      if (!client) { console.warn(`[hourly] 工单 ${t.id} 无可用 client，跳过`); continue; }
+
+      if (detail && orderQuery.isSuccess(detail.status)) {
+        // 平台成功 → 回商户「查单成功」，结单
+        if (await merchantMsgExists(client, t.merchant_chat_id, t.merchant_msg_id)) {
+          const card = orderQuery.buildResultCard({ detail, submittedOrderNo, success: true, note: "已补单成功" });
+          await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
+        }
+        await tgDbService.finishTicket(t.id, {
+          queryResult: "查单成功", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
+        });
+        console.log(`[hourly] 工单 ${t.id} 平台已成功，回复商户并结单`);
+      } else if (isOver48hByCreated(t.order_created_time)) {
+        if (Number(t.channel_claimed_success) === 1) {
+          // 矛盾单 ≥48h → 报警监听群 + 转人工
+          await sendConflictAlert(client, t, detail);
+          await tgDbService.escalateTicket(t.id);
+          console.log(`[hourly] 工单 ${t.id} 矛盾单≥48h，已报警监听群并转人工`);
+        } else {
+          // 普通死单 ≥48h → 回商户「查单失败」，结单
+          if (await merchantMsgExists(client, t.merchant_chat_id, t.merchant_msg_id)) {
+            const detailForCard = detail || {
+              orderNo: t.platform_order_no, merchantOrderNo: submittedOrderNo,
+              createTime: t.order_created_time, status: null
+            };
+            const card = orderQuery.buildResultCard({ detail: detailForCard, submittedOrderNo, success: false, note: failNote(detail) });
+            await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
+          }
+          await tgDbService.finishTicket(t.id, {
+            queryResult: "查单失败", statusCode: detail ? detail.status : null,
+            utr: detail ? detail.utr : null, matchedOrderNo: detail ? detail.merchantOrderNo : null
+          });
+          console.log(`[hourly] 工单 ${t.id} 超48h仍未成功，回复商户查单失败并结单`);
+        }
+      }
+      // 未满 48h 且未成功 → 什么都不做，等下小时再查
+    } catch (err) {
+      console.error(`[hourly] 处理工单 ${t.id} 失败:`, err.message);
+    }
+  }
+}
+
+const HOURLY_SCAN_MS = 60 * 60 * 1000; // 每小时扫一次在途工单
+setInterval(() => {
+  processOpenTickets().catch(console.error);
+}, HOURLY_SCAN_MS);
+
+// /矛盾：列出所有「待人工核实」的矛盾单
+async function handleConflictList(client, chatId, message) {
+  const rows = await tgDbService.getConflictTickets();
+  if (!rows || rows.length === 0) {
+    await client.sendMessage(chatId, { message: "当前没有待人工核实的矛盾单", replyTo: message.id });
+    return;
+  }
+  let text = `⚠️ 待人工核实矛盾单 ${rows.length} 条（渠道判成功、平台判不成功、已超48h）：\n\n`;
+  rows.forEach((r, i) => {
+    text += `${i + 1}. 订单:${r.merchant_order_id}｜平台:${r.platform_order_no || "-"}｜商户群:${r.merchant_chat_id}\n`;
+  });
+  text += `\n人工核实处理后用「/矛盾处理:订单号」清除状态（商户号/平台号都可）`;
+  await client.sendMessage(chatId, { message: text, replyTo: message.id });
+}
+
+// /矛盾处理:订单号 —— 人工核实处理后，仅在后台清除状态（ticket_status 2→1），不通知商户
+// 订单号：商户单号 / 平台单号 都能匹配
+async function handleConflictResolve(client, chatId, message) {
+  const parts = message.message.replace(/：/g, ":").split(":");
+  const orderNo = parts.slice(1).join(":").trim();
+  if (!orderNo) {
+    await client.sendMessage(chatId, { message: "❌ 格式错误，请使用 /矛盾处理:订单号", replyTo: message.id });
+    return;
+  }
+  const affected = await tgDbService.resolveConflictByOrderNo(orderNo);
+  await client.sendMessage(chatId, {
+    message: affected > 0
+      ? `✅ 矛盾单 ${orderNo} 已清除状态（${affected} 条）`
+      : `⚠️ 未找到待处理的矛盾单 ${orderNo}（可能已处理或订单号有误，商户号/平台号均可）`,
+    replyTo: message.id
+  });
+}
 
 /**
  * 处理订单状态为0，并转发

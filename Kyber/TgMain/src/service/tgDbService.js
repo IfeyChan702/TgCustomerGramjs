@@ -646,12 +646,85 @@ const getDueRetryTickets = async () => {
   return await queryAsync(sql);
 };
 
+/**
+ * 取所有「在途」UTR 查单工单（每小时定时重查用）
+ * 注意：必须限定 query_result='处理中'，只取真正的 UTR 工单，
+ * 否则会把 3 万多条 query_result=NULL 的旧历史行也扫进来。
+ */
+const getOpenUtrTickets = async () => {
+  const sql = `
+      SELECT id,
+             merchant_chat_id,
+             merchant_msg_id,
+             merchant_order_id,
+             platform_order_no,
+             order_created_time,
+             channel_claimed_success
+      FROM tg_order
+      WHERE ticket_status = 0
+        AND query_result = '处理中'
+      ORDER BY id ASC
+      LIMIT 500
+  `;
+  return await queryAsync(sql);
+};
+
+/**
+ * 标记「渠道声称成功、但平台暂未确认」（<48h 的矛盾单，等平台重查确认）
+ */
+const markChannelClaimedSuccess = async (id) => {
+  const result = await queryAsync(
+    `UPDATE tg_order SET channel_claimed_success = 1 WHERE id = ?`, [id]);
+  return result.affectedRows;
+};
+
+/**
+ * 升级为「待人工核实」（矛盾单 ≥48h）：ticket_status=2，已报警监听群
+ */
+const escalateTicket = async (id) => {
+  const result = await queryAsync(
+    `UPDATE tg_order SET ticket_status = 2, query_result = '待人工核实', next_retry_time = NULL WHERE id = ?`, [id]);
+  return result.affectedRows;
+};
+
+/**
+ * 取所有「待人工核实」的矛盾单（/矛盾 命令用）
+ */
+const getConflictTickets = async () => {
+  const sql = `
+      SELECT id, merchant_order_id, platform_order_no, merchant_chat_id,
+             order_created_time, status_code, created_time
+      FROM tg_order
+      WHERE ticket_status = 2
+      ORDER BY created_time ASC
+      LIMIT 100
+  `;
+  return await queryAsync(sql);
+};
+
+/**
+ * 人工把矛盾单清除状态（ticket_status 2 → 1，仅后台标记，不通知商户）
+ * 订单号：商户单号 / 平台单号 都能匹配
+ */
+const resolveConflictByOrderNo = async (orderNo) => {
+  const result = await queryAsync(
+    `UPDATE tg_order SET ticket_status = 1, query_result = '已人工处理'
+     WHERE (merchant_order_id = ? OR platform_order_no = ?) AND ticket_status = 2`,
+    [orderNo, orderNo]);
+  return result.affectedRows;
+};
+
 // 统一导出
 module.exports = {
   insertQueryTicket,
   finishTicket,
   scheduleNextRetry,
   getDueRetryTickets,
+  getOpenUtrTickets,
+  markChannelClaimedSuccess,
+  escalateTicket,
+  getConflictTickets,
+  resolveConflictByOrderNo,
   getAccountIdsByChatIdInMerchant,
   getAccountIdByTelegramId,
   getAllAccountIdsInMerchant,

@@ -74,6 +74,7 @@ function fmtAmount(amount) {
 // 解析 createTime 为毫秒时间戳（接口可能返回 epoch秒/毫秒 或 日期字符串）
 function toEpochMs(t) {
   if (t == null || t === "") return NaN;
+  if (t instanceof Date) return t.getTime();   // MySQL 驱动可能把 DATETIME 返回成 Date 对象
   const str = String(t).trim();
   if (typeof t === "number" || /^\d{10,13}$/.test(str)) {
     let ms = Number(str);
