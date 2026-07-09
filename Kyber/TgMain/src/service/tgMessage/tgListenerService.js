@@ -671,27 +671,38 @@ async function sendConflictAlert(client, ctx, detail) {
   }
 }
 
-// 每小时定时重查：只扫真正在途的 UTR 工单（query_result='处理中'），逐条查平台
+// 定时重查：每5分钟扫「到期」工单(next_retry_time 到点的)，逐条查平台，未结单的顺延1小时
+// 每张单按自己入单时间错峰、约每小时查一次，避免每小时一次性集中打接口
 async function processOpenTickets() {
   let tickets;
   try {
-    tickets = await tgDbService.getOpenUtrTickets();
+    tickets = await tgDbService.getDueRetryTickets();
   } catch (e) {
-    console.error("[hourly] 取在途工单失败:", e.message);
+    console.error("[requery] 取到期工单失败:", e.message);
     return;
   }
   if (!tickets || !tickets.length) return;
-  console.log(`[hourly] 在途 UTR 工单 ${tickets.length} 条，开始平台重查`);
+  console.log(`[requery] 到期工单 ${tickets.length} 条，开始平台重查`);
 
   for (const t of tickets) {
     try {
       const submittedOrderNo = t.merchant_order_id;
       const queryNo = t.platform_order_no || submittedOrderNo;
-      const detail = await orderQuery.queryOrderDetail(queryNo);
       const client = await findClientForMerchant(t.merchant_chat_id);
-      if (!client) { console.warn(`[hourly] 工单 ${t.id} 无可用 client，跳过`); continue; }
+      if (!client) {
+        console.warn(`[requery] 工单 ${t.id} 无可用 client，顺延1小时`);
+        await tgDbService.scheduleNextRetry(t.id);
+        continue;
+      }
+      const detail = await orderQuery.queryOrderDetail(queryNo);
+      if (!detail) {
+        // 平台暂时查不到(网络/接口抖动) → 不判定，顺延1小时重试
+        console.warn(`[requery] 工单 ${t.id} 平台无数据，顺延1小时`);
+        await tgDbService.scheduleNextRetry(t.id);
+        continue;
+      }
 
-      if (detail && orderQuery.isSuccess(detail.status)) {
+      if (orderQuery.isSuccess(detail.status)) {
         // 平台成功 → 回商户「查单成功」，结单
         if (await merchantMsgExists(client, t.merchant_chat_id, t.merchant_msg_id)) {
           const card = orderQuery.buildResultCard({ detail, submittedOrderNo, success: true, note: "已补单成功" });
@@ -700,41 +711,40 @@ async function processOpenTickets() {
         await tgDbService.finishTicket(t.id, {
           queryResult: "查单成功", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
         });
-        console.log(`[hourly] 工单 ${t.id} 平台已成功，回复商户并结单`);
+        console.log(`[requery] 工单 ${t.id} 平台已成功，回复商户并结单`);
       } else if (isOver48hByCreated(t.order_created_time)) {
         if (Number(t.channel_claimed_success) === 1) {
           // 矛盾单 ≥48h → 报警监听群 + 转人工
           await sendConflictAlert(client, t, detail);
           await tgDbService.escalateTicket(t.id);
-          console.log(`[hourly] 工单 ${t.id} 矛盾单≥48h，已报警监听群并转人工`);
+          console.log(`[requery] 工单 ${t.id} 矛盾单≥48h，已报警监听群并转人工`);
         } else {
           // 普通死单 ≥48h → 回商户「查单失败」，结单
           if (await merchantMsgExists(client, t.merchant_chat_id, t.merchant_msg_id)) {
-            const detailForCard = detail || {
-              orderNo: t.platform_order_no, merchantOrderNo: submittedOrderNo,
-              createTime: t.order_created_time, status: null
-            };
-            const card = orderQuery.buildResultCard({ detail: detailForCard, submittedOrderNo, success: false, note: failNote(detail) });
+            const card = orderQuery.buildResultCard({ detail, submittedOrderNo, success: false, note: failNote(detail) });
             await client.sendMessage(BigInt(t.merchant_chat_id), { message: card, replyTo: Number(t.merchant_msg_id) });
           }
           await tgDbService.finishTicket(t.id, {
-            queryResult: "查单失败", statusCode: detail ? detail.status : null,
-            utr: detail ? detail.utr : null, matchedOrderNo: detail ? detail.merchantOrderNo : null
+            queryResult: "查单失败", statusCode: detail.status, utr: detail.utr, matchedOrderNo: detail.merchantOrderNo
           });
-          console.log(`[hourly] 工单 ${t.id} 超48h仍未成功，回复商户查单失败并结单`);
+          console.log(`[requery] 工单 ${t.id} 超48h仍未成功，回复商户查单失败并结单`);
         }
+      } else {
+        // 未满48h且未成功 → 顺延到下一个小时再查
+        await tgDbService.scheduleNextRetry(t.id);
+        console.log(`[requery] 工单 ${t.id} 未成功(<48h)，顺延1小时`);
       }
-      // 未满 48h 且未成功 → 什么都不做，等下小时再查
     } catch (err) {
-      console.error(`[hourly] 处理工单 ${t.id} 失败:`, err.message);
+      console.error(`[requery] 处理工单 ${t.id} 失败:`, err.message);
+      try { await tgDbService.scheduleNextRetry(t.id); } catch (_) {}
     }
   }
 }
 
-const HOURLY_SCAN_MS = 60 * 60 * 1000; // 每小时扫一次在途工单
+const SCAN_INTERVAL_MS = 5 * 60 * 1000; // 每5分钟扫一次到期工单（每单按入单时间错峰、约每小时查一次）
 setInterval(() => {
   processOpenTickets().catch(console.error);
-}, HOURLY_SCAN_MS);
+}, SCAN_INTERVAL_MS);
 
 // /矛盾：列出所有「待人工核实」的矛盾单
 async function handleConflictList(client, chatId, message) {

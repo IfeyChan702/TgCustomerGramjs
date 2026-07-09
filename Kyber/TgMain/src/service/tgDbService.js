@@ -571,8 +571,9 @@ const insertQueryTicket = async (p) => {
                             order_created_time,
                             status_code,
                             query_result,
-                            ticket_status)
-      VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, '处理中', 0)
+                            ticket_status,
+                            next_retry_time)
+      VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, '处理中', 0, DATE_ADD(NOW(), INTERVAL 1 HOUR))
   `;
   const values = [
     p.channelMsgId,
@@ -625,7 +626,8 @@ const scheduleNextRetry = async (id) => {
 };
 
 /**
- * 取所有到期需要自动重查的处理中工单
+ * 取「到期」需要重查的在途工单（每5分钟扫一次，只挑 next_retry_time 到点的）
+ * 只取真正 UTR 工单(query_result='处理中')；旧历史行 next_retry_time=NULL 天然被排除
  */
 const getDueRetryTickets = async () => {
   const sql = `
@@ -635,13 +637,15 @@ const getDueRetryTickets = async () => {
              merchant_order_id,
              platform_order_no,
              order_created_time,
+             channel_claimed_success,
              retry_count
       FROM tg_order
       WHERE ticket_status = 0
+        AND query_result = '处理中'
         AND next_retry_time IS NOT NULL
         AND next_retry_time <= NOW()
       ORDER BY next_retry_time ASC
-      LIMIT 50
+      LIMIT 100
   `;
   return await queryAsync(sql);
 };
