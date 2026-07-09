@@ -9,8 +9,9 @@ const { getErsanToken } = require("./handleOrder");
 const PLT_API_BASE = process.env.PLT_API_BASE || "https://api.gamecloud.vip";
 const ORDER_DETAIL_URL = `${PLT_API_BASE}/admin-api/plt/order-in/get`;
 
-// 订单状态码：0-创建成功 10-待收款 11-收款成功 12-分润完成
-//            20-待付款 21-付款成功 22-分润完成 23-付款失败 30-已取消
+// 订单状态码(代收)：0-创建成功 10-待收款 11-收款成功 12-结算完成 13-收款待确认 30-收款失败
+// 成功=11/12；其余(0/10/13/30)一律按「非成功」处理(转渠道/每小时重查/满48h判查单失败)
+// 满48h判失败时，失败卡片「说明」取平台 statusDesc，商户能看到真实状态描述
 const SUCCESS_STATUS = new Set([11, 12]);
 const FAIL_STATUS = new Set([23, 30]);
 
