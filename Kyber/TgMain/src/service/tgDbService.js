@@ -187,12 +187,16 @@ const getLatestAccountIds = async () => {
 
 /**
  * 查找回复文本（根据匹配规则）
+ * 命中多条时取「match_rule 最长」的那条 —— 即最具体的规则优先。
+ * 否则像「反转成功」这种会被 2 个字的笼统规则「成功」抢走，被误判成成功。
  */
 const getReplyText = async (matchRule) => {
   const sql = `
       SELECT id, reply_text
       FROM tg_reply
-      WHERE ? LIKE CONCAT('%', match_rule, '%') LIMIT 1
+      WHERE ? LIKE CONCAT('%', match_rule, '%')
+      ORDER BY CHAR_LENGTH(match_rule) DESC, id ASC
+      LIMIT 1
   `;
   const results = await queryAsync(sql, [matchRule]);
   return results.length > 0 ? results[0] : null;
